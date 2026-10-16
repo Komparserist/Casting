@@ -1,0 +1,1684 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#c8102e">
+<title>Casting-Kartei</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: Setkarten-Raster. Jede Person ist eine Comp-Card mit Hochformat-Foto links und Messwerten in Mono rechts. Filter klappen oben auf, Details und Formular öffnen als Sheet. */
+:root{
+  --bg:#eceff2; --surface:#ffffff; --ink:#141922; --muted:#586270; --line:#d3d9df; --chip:#e3e8ed;
+  --accent:#c8102e; --accent-ink:#ffffff; --ok:#1c7d45; --warn:#9a5b00; --focus:#2a6df4; --scrim:rgba(10,14,20,.5); --ok-ink:#ffffff;
+  --f-display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1318; --surface:#181e26; --ink:#e9edf2; --muted:#9aa5b2; --line:#2b333d; --chip:#222b35;
+    --accent:#ff5a6e; --accent-ink:#1d0a0e; --ok:#4cc382; --warn:#e7a23a; --focus:#7ba4ff; --scrim:rgba(0,0,0,.65); --ok-ink:#08210f;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1318; --surface:#181e26; --ink:#e9edf2; --muted:#9aa5b2; --line:#2b333d; --chip:#222b35;
+  --accent:#ff5a6e; --accent-ink:#1d0a0e; --ok:#4cc382; --warn:#e7a23a; --focus:#7ba4ff; --scrim:rgba(0,0,0,.65); --ok-ink:#08210f;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:0 40px}
+.wrap{max-width:1120px;margin-inline:auto}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;margin:0;letter-spacing:.01em;text-wrap:balance}
+
+.top{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;justify-content:space-between;padding-block:22px 14px}
+.top h1{font-size:36px;line-height:1;text-transform:uppercase;letter-spacing:.04em}
+.sub{margin:6px 0 0;color:var(--muted);font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.topact{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;min-height:40px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--accent);border-color:var(--accent)}
+.btn.small{padding:5px 10px;min-height:30px;font-size:13px}
+.btn[disabled]{opacity:.55;cursor:default}
+.badge{background:var(--accent);color:var(--accent-ink);border-radius:99px;font-size:12px;min-width:20px;padding:0 6px;text-align:center;font-family:var(--f-mono)}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid var(--line)}
+.search{flex:1 1 220px;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 12px;min-height:40px}
+.tabs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.tab{border:0;background:transparent;padding:9px 12px;font-weight:600;min-height:38px;color:var(--muted)}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.sort{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 10px;min-height:40px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.fr label,.fld label,.fl{display:block;font-family:var(--f-display);text-transform:uppercase;letter-spacing:.07em;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.fr .u{text-transform:none;letter-spacing:0;font-family:var(--f-mono);font-size:11px}
+.pair{display:flex;gap:6px}
+.pair input,.fr>input{min-width:0;width:100%}
+input[type=text],input[type=number],input[type=date],input:not([type]),select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:8px 10px;min-height:38px;width:100%}
+textarea{min-height:84px;resize:vertical}
+.fg{margin-bottom:12px}
+.hint{text-transform:none;letter-spacing:0;font-family:var(--f-body);font-weight:400;font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--chip);border-radius:99px;padding:5px 12px;font-size:13.5px;font-weight:500;min-height:32px;display:inline-flex;align-items:center}
+.chip.on,.chk input:checked+span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chk{padding:0;position:relative;border:0;background:transparent}
+.chk input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chk span{border:1px solid var(--line);background:var(--chip);border-radius:99px;padding:5px 12px;min-height:32px;display:inline-flex;align-items:center;font-size:13.5px;font-weight:500}
+.chk input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}
+.ptools{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.toggles{display:flex;flex-wrap:wrap;gap:6px}
+
+.banner{margin-top:12px;border:1px dashed var(--warn);color:var(--ink);background:var(--surface);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px;margin-top:14px}
+.card{display:flex;gap:14px;text-align:left;width:100%;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card:hover{border-color:var(--muted)}
+.ph{flex:none;width:76px;aspect-ratio:3/4;border-radius:6px;background:var(--chip);overflow:hidden;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:26px;color:var(--muted)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ci{min-width:0;display:flex;flex-direction:column;gap:3px}
+.cn{font-family:var(--f-display);font-size:23px;font-weight:700;line-height:1.05;overflow-wrap:anywhere}
+.cm{font-family:var(--f-mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.cl{font-size:13.5px;color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;margin-top:auto;padding-top:6px;font-size:12.5px}
+.pill{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.08em;font-weight:600;font-size:12.5px;border:1px solid var(--ink);border-radius:4px;padding:0 6px}
+.dot{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+.dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{color:var(--ok)}.dot.ok::before{background:var(--ok)}
+.warn{color:var(--warn);font-weight:600}
+.empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:10px;padding:34px 18px;text-align:center;color:var(--muted)}
+.empty h3{color:var(--ink);font-size:24px;margin-bottom:6px}
+.empty .btn{margin-top:12px}
+
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:760px;max-height:94%;overflow:auto;border-radius:16px 16px 0 0;padding:0 18px calc(18px + env(safe-area-inset-bottom,0px));overscroll-behavior:contain}
+@media (min-width:760px){.scrim{align-items:center;padding:24px}.sheet{border-radius:14px;max-height:90%}}
+.sh{position:sticky;top:0;background:var(--surface);display:flex;gap:10px;justify-content:space-between;align-items:center;padding-block:14px 10px;z-index:2;border-bottom:1px solid var(--line);margin-bottom:14px}
+.sh h2{font-size:26px;text-transform:uppercase;letter-spacing:.03em}
+.x{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-width:40px;min-height:40px;font-size:20px;line-height:1}
+.dhead{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.dhead .ph{width:132px;font-size:44px}
+.dhead .dn{min-width:0;flex:1 1 200px}
+.dhead h2{font-size:34px;line-height:1;overflow-wrap:anywhere}
+dl.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px 16px;margin:0 0 14px}
+dl.facts div{min-width:0}
+dl.facts dt{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.07em;font-size:12.5px;font-weight:600;color:var(--muted)}
+dl.facts dd{margin:0;font-family:var(--f-mono);font-size:14px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.sec{margin-bottom:14px}
+.sec h3{font-size:16px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;font-weight:600}
+.copyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-family:var(--f-mono);font-size:14px}
+.copyrow span{user-select:all;overflow-wrap:anywhere;min-width:0}
+.notes{white-space:pre-wrap;overflow-wrap:anywhere}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+fieldset{border:0;padding:0;margin:0 0 18px;min-width:0}
+legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:0;margin-bottom:8px;color:var(--ink)}
+.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.cols.wide{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.zoomable{border:0;padding:0;cursor:zoom-in;font:inherit}
+.zoomable:hover{filter:brightness(.92)}
+.lb{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:16px;cursor:zoom-out}
+.lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;background:#222}
+.lbx{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px}
+.ptile{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0}
+.ptile .ph{width:100%;font-size:32px}
+.pl{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.06em;font-size:13px;font-weight:600;color:var(--muted)}
+.pthumbs{display:flex;flex-wrap:wrap;gap:10px}
+.pth{border:0;padding:0;background:none;cursor:zoom-in;text-align:left;width:84px;font:inherit;color:inherit}
+.pth .ph{width:84px}
+.pth span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.lbcap{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));text-align:center;color:#fff;font-family:var(--f-mono);font-size:13px;pointer-events:none}
+.lbn{position:absolute;top:50%;transform:translateY(-50%);border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;border-radius:99px;width:44px;height:44px;font-size:26px;line-height:1}
+.lbp{left:10px}.lbnx{right:10px}
+.lb.single .lbn{display:none}
+.cal{display:block;max-width:440px}
+.calm{display:grid;gap:4px}
+.calm+.calm{margin-top:16px;padding-top:12px;border-top:2px solid var(--line)}
+.calt{font-family:var(--f-display);font-weight:700;font-size:21px;text-transform:uppercase;letter-spacing:.05em;line-height:1.1;margin-bottom:2px}
+.cd.gap{visibility:hidden}
+.cd.we:not(.on){background:var(--chip)}
+.calh,.calr{display:grid;grid-template-columns:42px repeat(7,minmax(0,1fr));gap:4px;align-items:center}
+.calh span{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.06em;font-size:12.5px;color:var(--muted);text-align:center}
+.kw{border:0;background:transparent;font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:left;padding:0;min-height:38px}
+.kw:not(:disabled){cursor:pointer}
+.kw:hover:not(:disabled){color:var(--ink);text-decoration:underline}
+.cd{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;min-height:42px;padding:2px 0 0;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.cd small{font-family:var(--f-display);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.cd:not(:disabled){cursor:pointer}
+.cd:hover:not(:disabled){border-color:var(--muted)}
+.cd.on{background:var(--ok);border-color:var(--ok);color:var(--ok-ink)}
+.cd.on small{color:inherit}
+.cd.past{opacity:.35}
+.cd.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.calnote{margin:8px 0 0}
+.ferr{color:var(--accent);font-weight:600;min-height:20px}
+.pup{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.consent{display:flex;gap:10px;align-items:flex-start;line-height:1.35}
+.consent input{width:20px;height:20px;margin-top:2px;flex:none;min-height:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:40;max-width:calc(100% - 32px);font-weight:500}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}}
+.navtabs{width:fit-content;max-width:100%;margin-bottom:4px}
+.navtabs .tab{padding:9px 18px}
+.pbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.pbar select{flex:1 1 240px;width:auto;min-width:0;min-height:40px}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}
+.pcard h2{font-size:32px;line-height:1.05;overflow-wrap:anywhere}
+.days{display:flex;flex-wrap:wrap;gap:6px}
+.rolegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:10px}
+.role{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg);min-width:0}
+.role b{font-family:var(--f-display);font-size:19px;text-transform:uppercase;letter-spacing:.04em;overflow-wrap:anywhere}
+.mh{font-family:var(--f-display);font-size:24px;text-transform:uppercase;letter-spacing:.04em;margin:20px 0 0;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.mh small{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);text-transform:none;letter-spacing:0}
+.mwrap{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mwrap .btn{align-self:flex-start}
+.score{font-family:var(--f-mono);font-size:12.5px;color:var(--ok);font-weight:500}
+.score.part{color:var(--warn)}
+.score.no{color:var(--muted)}
+.edrow{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--bg)}
+.edrow .cols{margin-bottom:10px}
+.drow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}
+.drow .fld{flex:1 1 140px;min-width:0}
+.intro{margin:12px 0 0;color:var(--muted);max-width:68ch}
+.selfwrap{max-width:760px;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.okmsg{color:var(--ok);font-weight:600;margin:10px 0 0}
+.kc{cursor:default}
+.kc .ph{border:0;padding:0}
+.sec .copyrow{margin-top:2px}
+.who{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.auth{max-width:520px;margin:0 auto;padding-block:28px}
+.auth h1{font-size:40px;text-transform:uppercase;letter-spacing:.04em;line-height:1}
+.auth .card2{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-top:16px}
+.auth .fld{margin-bottom:12px}
+.rolepick{display:grid;gap:8px;margin-bottom:12px}
+.rolepick label{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;background:var(--bg)}
+.rolepick input{margin-top:3px;width:18px;height:18px;min-height:0;flex:none}
+.rolepick b{display:block}
+.foot{margin-top:24px;font-size:13px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.foot a{color:inherit}
+.demo{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+</style>
+</head>
+<body>
+<div id="auth" hidden></div>
+<div id="app" hidden>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Casting-Kartei</h1>
+      <p class="sub" id="count">Lade …</p>
+    </div>
+    <div class="who"><span id="whoami"></span><button type="button" class="btn small" data-act="logout">Abmelden</button></div>
+    <div class="topact" id="topact">
+      <button type="button" class="btn" id="btnFilter" data-act="filters" aria-expanded="false" aria-controls="panel">Filter <span class="badge" id="fbadge" hidden>0</span></button>
+      <button type="button" class="btn primary" id="btnAdd" data-act="add">Neues Profil</button>
+    </div>
+  </header>
+  <nav class="tabs navtabs" id="nav" aria-label="Masken" hidden>
+    <button type="button" class="tab" data-act="view" data-v="kartei" aria-pressed="true">Kartei</button>
+    <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte</button>
+    <button type="button" class="tab" data-act="view" data-v="self" aria-pressed="false">Mein Profil</button>
+    <button type="button" class="tab" data-act="view" data-v="kunde" aria-pressed="false">Für Produktionen</button>
+  </nav>
+
+  <div id="v-kartei">
+    <div class="bar" role="search">
+      <input class="search" id="q" type="search" placeholder="Name, Ort, Sprache, Fertigkeit oder Notiz suchen" aria-label="Suche">
+      <button type="button" class="btn" data-act="clear">Alle anzeigen</button>
+      <div class="tabs" role="group" aria-label="Kategorie">
+        <button type="button" class="tab" data-act="typ" data-v="alle" aria-pressed="true">Alle</button>
+        <button type="button" class="tab" data-act="typ" data-v="Schauspieler" aria-pressed="false">Schauspieler</button>
+        <button type="button" class="tab" data-act="typ" data-v="Komparse" aria-pressed="false">Komparsen</button>
+      </div>
+      <select class="sort" id="sort" aria-label="Sortierung">
+        <option value="name">Sortieren: Name A–Z</option>
+        <option value="plz">Postleitzahl aufsteigend</option>
+        <option value="frei">Früheste Verfügbarkeit</option>
+        <option value="geschlecht">Geschlecht</option>
+        <option value="alter">Alter aufsteigend</option>
+        <option value="alterab">Alter absteigend</option>
+        <option value="groesse">Größe absteigend</option>
+        <option value="neu">Zuletzt angelegt</option>
+      </select>
+    </div>
+    <section class="panel" id="panel" hidden></section>
+    <div id="banner"></div>
+    <main class="grid" id="list"></main>
+  </div>
+  <div id="v-proj" hidden></div>
+  <div id="v-self" hidden></div>
+  <div id="v-kunde" hidden></div>
+</div>
+
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
+<div class="lb" id="lb" data-act="lbclose" hidden><button type="button" class="x lbx" data-act="lbclose" aria-label="Foto schließen">×</button><img id="lbimg" alt=""><div class="lbcap" id="lbcap"></div><button type="button" class="lbn lbp" data-act="lbprev" aria-label="Vorheriges Foto">‹</button><button type="button" class="lbn lbnx" data-act="lbnext" aria-label="Nächstes Foto">›</button></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+
+</div>
+<script type="module">
+// Zugangswerte deines Firebase-Projekts (Projekteinstellungen > Meine Apps > Web-App).
+// Diese Werte sind keine Geheimnisse. Der Schutz kommt von den Regeln in firestore.rules.
+const firebaseConfig = {
+  apiKey: "AIzaSyAq2BYJxh-dBVnCgN-kgBvfz8zGEnFXpuE",
+  authDomain: "agentur-5993a.firebaseapp.com",
+  projectId: "agentur-5993a",
+  storageBucket: "agentur-5993a.firebasestorage.app",
+  messagingSenderId: "751998266407",
+  appId: "1:751998266407:web:6b3f497cba9622fb1fb202"
+};
+
+// Testmodus ohne Server: alles liegt im Browser (localStorage). Nur zum Ausprobieren.
+const KEY = 'casting-local-v1';
+const listeners = {};
+let store = null;
+
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function dayOff(n) { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); }
+
+function seed() {
+  const people = [
+    { vorname: 'Lena', nachname: 'Hartmann', typ: ['Schauspieler'], geschlecht: 'weiblich', geburtsjahr: 1991, spielVon: 28, spielBis: 36, plz: '10115', ort: 'Berlin', groesse: 172, gewicht: 61, konfektion: 'M', schuh: 40, haarfarbe: 'braun', haarlaenge: 'lang', augenfarbe: 'grün', tattoos: 'nicht sichtbar', sprachen: ['Deutsch', 'Englisch', 'Französisch'], fertigkeiten: ['Reiten', 'Singen', 'Tanzen'], fuehrerschein: ['Klasse B'], erfahrung: 'Nebenrollen in zwei TV-Serien.', gage: 450, einwilligung: true, einwilligungDatum: '2026-09-02', email: 'lena@example.org', instagram: '@lena.example' },
+    { vorname: 'Murat', nachname: 'Yilmaz', typ: ['Schauspieler', 'Komparse'], geschlecht: 'männlich', geburtsjahr: 1980, spielVon: 42, spielBis: 52, plz: '50667', ort: 'Köln', groesse: 183, gewicht: 88, konfektion: 'L', schuh: 44, haarfarbe: 'schwarz', haarlaenge: 'kurz', augenfarbe: 'braun', bart: 'Vollbart', tattoos: 'sichtbar', sprachen: ['Deutsch', 'Türkisch', 'Englisch'], fertigkeiten: ['Kampfsport', 'Motorrad'], fuehrerschein: ['Klasse B', 'Klasse A (Motorrad)'], gage: 380, einwilligung: true, einwilligungDatum: '2026-08-15' },
+    { vorname: 'Greta', nachname: 'Neumann', typ: ['Komparse'], geschlecht: 'weiblich', geburtsjahr: 1952, spielVon: 68, spielBis: 78, plz: '04109', ort: 'Leipzig', groesse: 162, gewicht: 66, konfektion: 'L', schuh: 38, haarfarbe: 'grau', haarlaenge: 'kurz', augenfarbe: 'blau', tattoos: 'keine', sprachen: ['Deutsch'], gage: 120, einwilligung: true, einwilligungDatum: '2026-09-20', brille: true, notizen: 'Gerne Rollen als Oma, Marktszenen, Café.' },
+    { vorname: 'Jonas', nachname: 'Becker', typ: ['Komparse'], geschlecht: 'männlich', geburtsjahr: 1999, spielVon: 20, spielBis: 28, plz: '10435', ort: 'Berlin', groesse: 190, gewicht: 79, konfektion: 'M', schuh: 45, haarfarbe: 'blond', haarlaenge: 'mittel', augenfarbe: 'blau', bart: 'Dreitagebart', tattoos: 'keine', sprachen: ['Deutsch', 'Englisch'], fertigkeiten: ['Schwimmen', 'Skifahren', 'Tauchen'], fuehrerschein: ['Klasse B'], gage: 120, einwilligung: false },
+    { vorname: 'Amara', nachname: 'Okafor', typ: ['Schauspieler'], geschlecht: 'weiblich', geburtsjahr: 1995, spielVon: 24, spielBis: 32, plz: '80331', ort: 'München', groesse: 176, gewicht: 63, konfektion: 'S', schuh: 41, haarfarbe: 'schwarz', haarlaenge: 'kurz', augenfarbe: 'braun', tattoos: 'keine', sprachen: ['Deutsch', 'Englisch', 'Französisch'], fertigkeiten: ['Tanzen', 'Singen', 'Akrobatik', 'Instrument'], fuehrerschein: ['Klasse B'], gage: 520, einwilligung: true, einwilligungDatum: '2026-07-30' },
+    { vorname: 'Peter', nachname: 'Wagner', typ: ['Komparse'], geschlecht: 'männlich', geburtsjahr: 1968, spielVon: 50, spielBis: 62, plz: '20095', ort: 'Hamburg', groesse: 178, gewicht: 91, konfektion: 'XL', schuh: 43, haarfarbe: 'grau', haarlaenge: 'kurz', augenfarbe: 'grau', bart: 'Schnurrbart', tattoos: 'keine', sprachen: ['Deutsch', 'Polnisch'], fertigkeiten: ['Motorrad'], fuehrerschein: ['Klasse B', 'Klasse C (LKW)'], gage: 120, einwilligung: true, einwilligungDatum: '2026-09-11', brille: true }
+  ];
+  const pat = [[3, 9], [3, 20], [12, 30], [5, 8], [40, 50], [2, 14]];
+  const data = { people: {}, users: {}, projekte: {}, ausschreibung: {} };
+  people.forEach((p, i) => {
+    p.id = 'ex' + i; p.example = true; p.createdAt = 1000 + i; p.verfDates = [];
+    for (let k = pat[i][0]; k <= pat[i][1]; k++) p.verfDates.push(dayOff(k));
+    data.people[p.id] = p;
+  });
+  data.users = {
+    u_admin: { rolle: 'admin', name: 'Demo Agentur', email: 'admin@demo.test' },
+    u_bew: { rolle: 'bewerber', name: 'Demo Bewerber', email: 'bewerber@demo.test' },
+    u_kunde: { rolle: 'kunde', name: 'Demo Produktion', email: 'kunde@demo.test' }
+  };
+  data.ausschreibung.demo1 = { ort: 'Köln', tage: [{ von: dayOff(5), bis: dayOff(7) }], rollen: [{ name: 'Passanten', anzahl: 10, typ: 'Komparse', beschr: 'Straßenszene, Herbstkleidung', krit: ['Komparse'] }] };
+  return { data, session: null, accounts: {} };
+}
+function load() {
+  if (store) return store;
+  try { store = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!store || !store.data) store = seed();
+  return store;
+}
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+function C(c) { const s = load(); return s.data[c] || (s.data[c] = {}); }
+function snapDocs(c, filter) {
+  return Object.keys(C(c)).filter((k) => !filter || filter(C(c)[k])).map((k) => {
+    const o = Object.freeze(JSON.parse(JSON.stringify(C(c)[k])));
+    return { id: k, data: () => o };
+  });
+}
+function notify(c) { persist(); (listeners[c] || []).forEach((l) => l.fn({ docs: snapDocs(c, l.filter) })); }
+function ref(c, id) {
+  return {
+    id,
+    set: (d) => { C(c)[id] = JSON.parse(JSON.stringify(d)); notify(c); return Promise.resolve(); },
+    update: (d) => { C(c)[id] = Object.assign({}, C(c)[id], JSON.parse(JSON.stringify(d))); notify(c); return Promise.resolve(); },
+    get: () => { const o = C(c)[id]; return Promise.resolve({ exists: !!o, data: () => o }); },
+    delete: () => { delete C(c)[id]; notify(c); return Promise.resolve(); }
+  };
+}
+function coll(c, filter) {
+  return {
+    doc: (id) => ref(c, id || 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+    get: () => Promise.resolve({ docs: snapDocs(c, filter) }),
+    onSnapshot: (ok) => {
+      const l = { fn: ok, filter };
+      (listeners[c] = listeners[c] || []).push(l);
+      setTimeout(() => ok({ docs: snapDocs(c, filter) }), 30);
+      return () => { listeners[c] = listeners[c].filter((x) => x !== l); };
+    },
+    where: (f, op, v) => coll(c, (d) => d[f] === v)
+  };
+}
+
+async function createLocal() {
+  load();
+  const db = {
+    collection: (p) => coll(p),
+    doc: (p) => { const q = p.split('/'); const id = q.pop(); return ref(q.join('/'), id); }
+  };
+  const info = (uid) => { const u = C('users')[uid]; return u ? { uid, email: u.email, name: u.name, role: u.rolle } : null; };
+  return {
+    mode: 'local',
+    db,
+    demo: ['u_admin', 'u_bew', 'u_kunde'],
+    onAuth(cb) { setTimeout(() => cb(store.session ? info(store.session) : null), 0); },
+    async signIn(email, pw, demoUid) {
+      let uid = demoUid;
+      if (!uid) {
+        uid = Object.keys(C('users')).filter((k) => C('users')[k].email === email.toLowerCase())[0];
+        if (!uid || (store.accounts[uid] || pw) !== pw) throw { code: 'auth/invalid-credential' };
+      }
+      store.session = uid; persist(); return info(uid);
+    },
+    async register(email, pw, name, role) {
+      email = email.toLowerCase();
+      if (Object.keys(C('users')).some((k) => C('users')[k].email === email)) throw { code: 'auth/email-already-in-use' };
+      const uid = 'u' + Date.now().toString(36);
+      C('users')[uid] = { rolle: role, name, email }; store.accounts[uid] = pw; store.session = uid; persist();
+    },
+    async reset() {},
+    async signOut() { store.session = null; persist(); },
+    async deleteAccount() { if (store.session) { delete C('users')[store.session]; store.session = null; persist(); } },
+    resetAll() { localStorage.removeItem(KEY); store = null; }
+  };
+}
+
+// Firebase-Anbindung (Login und Datenbank). Lädt die Firebase-Bibliothek direkt von Google.
+const V = '10.14.1';
+const base = 'https://www.gstatic.com/firebasejs/' + V + '/';
+
+async function createFire(cfg) {
+  const A = await import(base + 'firebase-app.js');
+  const AU = await import(base + 'firebase-auth.js');
+  const F = await import(base + 'firebase-firestore.js');
+  const app = A.initializeApp(cfg);
+  const auth = AU.getAuth(app);
+  const fs = F.initializeFirestore(app, { ignoreUndefinedProperties: true });
+
+  const snapDocs = (s) => s.docs.map((d) => ({ id: d.id, data: () => d.data() }));
+  function wrapDoc(ref) {
+    return {
+      id: ref.id,
+      get: async () => { const s = await F.getDoc(ref); return { exists: s.exists(), data: () => s.data() }; },
+      set: (d) => F.setDoc(ref, d),
+      update: (d) => F.updateDoc(ref, d),
+      delete: () => F.deleteDoc(ref)
+    };
+  }
+  function wrapColl(path, q) {
+    const cref = F.collection(fs, path);
+    const base = q || cref;
+    return {
+      doc: (id) => wrapDoc(id ? F.doc(fs, path, id) : F.doc(cref)),
+      get: async () => ({ docs: snapDocs(await F.getDocs(base)) }),
+      onSnapshot: (ok, err) => F.onSnapshot(base, (s) => ok({ docs: snapDocs(s) }), err),
+      where: (f, op, v) => wrapColl(path, F.query(base, F.where(f, op, v)))
+    };
+  }
+  const db = { collection: (p) => wrapColl(p), doc: (p) => wrapDoc(F.doc(fs, p)) };
+
+  let pending = null;
+  async function fetchInfo(u) {
+    const s = await F.getDoc(F.doc(fs, 'users/' + u.uid));
+    const d = s.exists() ? s.data() : null;
+    return { uid: u.uid, email: u.email || '', name: (d && d.name) || '', role: (d && d.rolle) || null };
+  }
+  return {
+    mode: 'firebase',
+    db,
+    onAuth(cb) {
+      AU.onAuthStateChanged(auth, async (u) => {
+        if (!u) { cb(null); return; }
+        if (pending) { try { await pending; } catch (e) {} }
+        try { cb(await fetchInfo(u)); } catch (e) { cb({ uid: u.uid, email: u.email || '', name: '', role: null, error: true }); }
+      });
+    },
+    signIn: (email, pw) => AU.signInWithEmailAndPassword(auth, email, pw),
+    async register(email, pw, name, role) {
+      let resolve;
+      pending = new Promise((r) => { resolve = r; });
+      try {
+        const c = await AU.createUserWithEmailAndPassword(auth, email, pw);
+        await F.setDoc(F.doc(fs, 'users/' + c.user.uid), { rolle: role, name: name, email: email, createdAt: Date.now() });
+      } finally { resolve(); pending = null; }
+    },
+    reset: (email) => AU.sendPasswordResetEmail(auth, email),
+    signOut: () => AU.signOut(auth),
+    async deleteAccount() { if (auth.currentUser) await AU.deleteUser(auth.currentUser); }
+  };
+}
+
+async function createBackend() {
+  const forceLocal = new URLSearchParams(location.search).has('local');
+  if (!forceLocal && firebaseConfig && firebaseConfig.apiKey) return createFire(firebaseConfig);
+  return createLocal();
+}
+
+function runApp(ctx){
+
+var YEAR=new Date().getFullYear();
+var TYPEN=['Schauspieler','Komparse'];
+var GESCHLECHT=['weiblich','männlich','divers'];
+var HAARFARBE=['blond','hellbraun','braun','dunkelbraun','schwarz','rot','grau','weiß','gefärbt','keine'];
+var HAARLAENGE=['kahl','kurz','mittel','lang'];
+var AUGEN=['blau','grün','braun','grau','haselnuss'];
+var BART=['kein Bart','Dreitagebart','Vollbart','Schnurrbart'];
+var KONF=['XS','S','M','L','XL','XXL','3XL'].concat([34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64].map(String));
+var TATTOOS=['keine','nicht sichtbar','sichtbar'];
+var SPRACHEN=['Deutsch','Englisch','Französisch','Spanisch','Italienisch','Türkisch','Russisch','Polnisch','Arabisch'];
+var SKILLS=['Reiten','Tanzen','Singen','Kampfsport','Schwimmen','Tauchen','Motorrad','Skifahren','Instrument','Akrobatik','Fechten'];
+var FS=['Klasse B','Klasse A (Motorrad)','Klasse C (LKW)'];
+var ALLSLOTS=[{k:'portrait',l:'Portrait'},{k:'ganzkoerper',l:'Ganzkörper'},{k:'profil',l:'Profilansicht'}];
+for(var ai=1;ai<=5;ai++)ALLSLOTS.push({k:'a'+ai,l:'Weiteres Foto '+ai});
+var MONTHS=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+var WEEKS=9;
+
+var GROUPS=[
+ {k:'geschlecht',label:'Geschlecht',field:'geschlecht',opts:GESCHLECHT},
+ {k:'haarfarbe',label:'Haarfarbe',field:'haarfarbe',opts:HAARFARBE},
+ {k:'haarlaenge',label:'Haarlänge',field:'haarlaenge',opts:HAARLAENGE},
+ {k:'augenfarbe',label:'Augenfarbe',field:'augenfarbe',opts:AUGEN},
+ {k:'bart',label:'Bart',field:'bart',opts:BART},
+ {k:'konfektion',label:'Konfektionsgröße',field:'konfektion',opts:KONF},
+ {k:'tattoos',label:'Tattoos',field:'tattoos',opts:TATTOOS},
+ {k:'sprachen',label:'Sprachen',field:'sprachen',opts:SPRACHEN,multi:true,dyn:true},
+ {k:'fertigkeiten',label:'Fertigkeiten',field:'fertigkeiten',opts:SKILLS,multi:true,dyn:true},
+ {k:'fuehrerschein',label:'Führerschein',field:'fuehrerschein',opts:FS,multi:true,dyn:true}
+];
+var RANGES=[
+ {k:'alter',label:'Alter',unit:'Jahre',get:function(p){return ageOf(p)}},
+ {k:'groesse',label:'Größe',unit:'cm',get:function(p){return p.groesse}},
+ {k:'gewicht',label:'Gewicht',unit:'kg',get:function(p){return p.gewicht}},
+ {k:'schuh',label:'Schuhgröße',unit:'EU',get:function(p){return p.schuh}},
+ {k:'gage',label:'Tagesgage',unit:'€',get:function(p){return p.gage}}
+];
+var TOGGLES=[
+ {k:'foto',label:'Mit Foto'},
+ {k:'brille',label:'Brillenträger'}
+];
+
+var state={people:[],q:'',typ:'alle',sort:'name',f:newFilters(),loaded:false,nodb:false,err:'',panelSig:'',confirmEx:false,photoEdits:{},photoDocs:{},photoLoad:null,gallery:[],galIdx:0,cal:null,detailLoad:null,view:'kartei',projects:[],pid:'',roleSel:'',pdraft:null,confirmDelP:false,confirmSelf:false,kDelId:'',selfOk:false,decAll:{},decKey:'',decUnsub:null,sending:false,kdocs:{}};
+var db=ctx.db,canWrite=true,role=ctx.role,isAdmin=ctx.role==='admin',uid=ctx.uid,myName=ctx.name||'',myEmail=ctx.email||'';
+
+function $(s,r){return (r||document).querySelector(s)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function num(v){if(v===''||v==null)return null;var n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null}
+function ageOf(p){return p.geburtsjahr?YEAR-p.geburtsjahr:null}
+function newFilters(){
+  var f={sets:{},r:{},t:{},spiel:'',plz:'',dFrom:'',dTo:''};
+  GROUPS.forEach(function(g){f.sets[g.k]=new Set()});
+  RANGES.forEach(function(r){f.r[r.k]={min:'',max:''}});
+  TOGGLES.forEach(function(t){f.t[t.k]=false});
+  return f;
+}
+function optsFor(g){
+  if(!g.dyn)return g.opts;
+  var s=new Set(g.opts);
+  state.people.forEach(function(p){(p[g.field]||[]).forEach(function(x){s.add(x)})});
+  return Array.from(s);
+}
+function activeCount(){
+  var f=state.f,n=0;
+  GROUPS.forEach(function(g){n+=f.sets[g.k].size});
+  RANGES.forEach(function(r){if(f.r[r.k].min!==''||f.r[r.k].max!=='')n++});
+  TOGGLES.forEach(function(t){if(f.t[t.k])n++});
+  if(f.spiel!=='')n++;
+  if(f.plz!=='')n++;
+  if(f.dFrom!=='')n++;
+  return n;
+}
+function initials(p){return ((p.vorname||'').charAt(0)+(p.nachname||'').charAt(0)).toUpperCase()||'?'}
+function fullName(p){return ((p.vorname||'')+' '+(p.nachname||'')).trim()||'Ohne Namen'}
+
+function match(p){
+  var f=state.f;
+  if(state.typ!=='alle'&&(p.typ||[]).indexOf(state.typ)<0)return false;
+  if(state.q){
+    var hay=[p.vorname,p.nachname,p.plz,p.ort,p.notizen,p.agentur].concat(p.sprachen||[],p.fertigkeiten||[]).join(' ').toLowerCase();
+    var toks=state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    for(var i=0;i<toks.length;i++){if(hay.indexOf(toks[i])<0)return false}
+  }
+  for(var gi=0;gi<GROUPS.length;gi++){
+    var g=GROUPS[gi],s=f.sets[g.k];
+    if(!s.size)continue;
+    var v=p[g.field];
+    if(g.multi){var arr=v||[];var ok=true;s.forEach(function(x){if(arr.indexOf(x)<0)ok=false});if(!ok)return false}
+    else if(!s.has(v))return false;
+  }
+  for(var ri=0;ri<RANGES.length;ri++){
+    var r=RANGES[ri],lo=num(f.r[r.k].min),hi=num(f.r[r.k].max);
+    if(lo==null&&hi==null)continue;
+    var val=r.get(p);
+    if(val==null)return false;
+    if(lo!=null&&val<lo)return false;
+    if(hi!=null&&val>hi)return false;
+  }
+  if(f.plz&&String(p.plz||'').indexOf(f.plz)!==0)return false;
+  if(f.dFrom){
+    var dv=p.verfDates||[],days=daysBetween(f.dFrom,f.dTo);
+    if(!days.length)return false;
+    for(var di=0;di<days.length;di++){if(dv.indexOf(days[di])<0)return false}
+  }
+  var sp=num(f.spiel);
+  if(sp!=null){
+    var a=p.spielVon!=null?p.spielVon:ageOf(p);
+    var b=p.spielBis!=null?p.spielBis:(p.spielVon!=null?p.spielVon:ageOf(p));
+    if(a==null||b==null||sp<a||sp>b)return false;
+  }
+  if(f.t.foto&&!p.hasFoto)return false;
+  if(f.t.brille&&!p.brille)return false;
+  return true;
+}
+function sorter(){
+  var c=function(a,b){return String(a||'').localeCompare(String(b||''),'de')};
+  if(state.sort==='neu')return function(a,b){return (b.createdAt||0)-(a.createdAt||0)};
+  var byName=function(a,b){return c(a.nachname,b.nachname)||c(a.vorname,b.vorname)};
+  if(state.sort==='alter')return function(a,b){var x=ageOf(a),y=ageOf(b);return ((x==null?999:x)-(y==null?999:y))||byName(a,b)};
+  if(state.sort==='alterab')return function(a,b){var x=ageOf(a),y=ageOf(b);return ((y==null?-1:y)-(x==null?-1:x))||byName(a,b)};
+  if(state.sort==='plz')return function(a,b){var x=a.plz||'\uffff',y=b.plz||'\uffff';return (x<y?-1:x>y?1:0)||byName(a,b)};
+  if(state.sort==='frei')return function(a,b){var x=nextFree(a)||'9999',y=nextFree(b)||'9999';return (x<y?-1:x>y?1:0)||byName(a,b)};
+  if(state.sort==='geschlecht')return function(a,b){var x=a.geschlecht||'zzz',y=b.geschlecht||'zzz';return c(x,y)||byName(a,b)};
+  if(state.sort==='groesse')return function(a,b){return (b.groesse||0)-(a.groesse||0)};
+  return function(a,b){return c(a.nachname,b.nachname)||c(a.vorname,b.vorname)};
+}
+
+/* ---------- Rendering ---------- */
+function cardHTML(p,extra){
+  var age=ageOf(p);
+  var meta=[age!=null?age+' J':null,p.groesse?p.groesse+' cm':null,p.konfektion?'Gr. '+p.konfektion:null,p.schuh?'Schuh '+p.schuh:null].filter(Boolean).join(' · ');
+  var look=[p.haarfarbe,p.haarlaenge?'Haar '+p.haarlaenge:null,p.augenfarbe?'Augen '+p.augenfarbe:null].filter(Boolean).join(' · ');
+  var tags='';
+  (p.typ||[]).forEach(function(t){tags+='<span class="pill">'+esc(t)+'</span>'});
+  if(p.selbst)tags+='<span class="cl">selbst eingetragen</span>';
+  if(p.ort||p.plz)tags+='<span class="cl">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</span>';
+  var nf=nextFree(p);if(nf&&!extra)tags+='<span class="cl">frei ab '+fmtDM(nf)+'</span>';
+  if(extra)tags+=extra;
+  if(!p.einwilligung)tags+='<span class="warn">Einwilligung fehlt</span>';
+  return '<button type="button" class="card" data-act="open" data-id="'+esc(p.id)+'">'+
+    '<div class="ph">'+(p.thumb?'<img alt="" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</div>'+
+    '<div class="ci"><div class="cn">'+esc(fullName(p))+'</div>'+
+    (meta?'<div class="cm">'+esc(meta)+'</div>':'')+
+    (look?'<div class="cl">'+esc(look)+'</div>':'')+
+    '<div class="tags">'+tags+'</div></div></button>';
+}
+function renderList(){
+  var total=state.people.length;
+  var list=state.people.filter(match).sort(sorter());
+  var el=$('#list');
+  if(state.nodb){
+    el.innerHTML='<div class="empty"><h3>Datenbank nicht erreichbar</h3><p>Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';
+    $('#count').textContent='Keine Verbindung zur Datenbank';state.loaded=false;
+  }else if(!state.loaded){
+    el.innerHTML='<div class="empty"><h3>Profile werden geladen</h3></div>';
+  }else if(!total){
+    el.innerHTML='<div class="empty"><h3>Noch keine Profile</h3><p>Lege das erste Profil für einen Schauspieler oder eine Komparsin an.</p>'+(canWrite?'<button type="button" class="btn primary" data-act="add">Erstes Profil anlegen</button>':'')+'</div>';
+  }else if(!list.length){
+    el.innerHTML='<div class="empty"><h3>Keine Treffer</h3><p>Kein Profil passt zu allen gewählten Kriterien.</p><button type="button" class="btn" data-act="clear">Filter zurücksetzen</button></div>';
+  }else{
+    el.innerHTML=list.map(cardHTML).join('');
+  }
+  if(state.loaded&&!state.nodb){
+    if(state.view==='kartei')$('#count').textContent=list.length+' von '+total+' Profilen';
+  }
+  var n=activeCount(),b=$('#fbadge');
+  b.hidden=!n;b.textContent=n;
+  var ex=state.people.filter(function(p){return p.example}).length;
+  $('#banner').innerHTML=ex&&canWrite?'<div class="banner"><span>Der Bestand enthält '+ex+' Beispielprofile zum Ausprobieren.</span><button type="button" class="btn small'+(state.confirmEx?' danger':'')+'" data-act="delex">'+(state.confirmEx?'Wirklich alle Beispiele löschen':'Beispielprofile löschen')+'</button></div>':'';
+  $('#btnAdd').hidden=!canWrite||state.nodb;
+}
+function panelHTML(){
+  var f=state.f,h='<div class="fgrid">';
+  RANGES.forEach(function(r){
+    h+='<div class="fr"><label>'+r.label+' <span class="u">'+r.unit+'</span></label><div class="pair">'+
+      '<input inputmode="decimal" aria-label="'+r.label+' von" placeholder="von" data-r="'+r.k+'" data-b="min" value="'+esc(f.r[r.k].min)+'">'+
+      '<input inputmode="decimal" aria-label="'+r.label+' bis" placeholder="bis" data-r="'+r.k+'" data-b="max" value="'+esc(f.r[r.k].max)+'"></div></div>';
+  });
+  h+='<div class="fr"><label>Spielalter <span class="u">Jahre</span></label><input inputmode="numeric" data-spiel="1" placeholder="z. B. 35" value="'+esc(f.spiel)+'"></div><div class="fr"><label>Postleitzahl <span class="u">beginnt mit</span></label><input inputmode="numeric" maxlength="5" data-plz="1" placeholder="z. B. 90" value="'+esc(f.plz)+'"></div><div class="fr"><label>Verfügbar von</label><input type="date" data-dfrom="1" value="'+esc(f.dFrom)+'"></div><div class="fr"><label>Verfügbar bis <span class="u">optional</span></label><input type="date" data-dto="1" value="'+esc(f.dTo)+'"></div></div>';
+  GROUPS.forEach(function(g){
+    h+='<div class="fg"><div class="fl">'+g.label+(g.multi?' <span class="hint">alle gewählten müssen passen</span>':'')+'</div><div class="chips">';
+    optsFor(g).forEach(function(o){
+      var on=f.sets[g.k].has(o);
+      h+='<button type="button" class="chip'+(on?' on':'')+'" aria-pressed="'+on+'" data-act="chip" data-g="'+g.k+'" data-v="'+esc(o)+'">'+esc(o)+'</button>';
+    });
+    h+='</div></div>';
+  });
+  h+='<div class="ptools"><div class="toggles">';
+  TOGGLES.forEach(function(t){
+    var on=f.t[t.k];
+    h+='<button type="button" class="chip'+(on?' on':'')+'" aria-pressed="'+on+'" data-act="toggle" data-t="'+t.k+'">'+t.label+'</button>';
+  });
+  h+='</div><button type="button" class="btn small" data-act="clear">Alle Filter zurücksetzen</button></div>';
+  return h;
+}
+function panelSig(){return JSON.stringify(GROUPS.filter(function(g){return g.dyn}).map(optsFor))}
+function refreshPanel(force){
+  var sig=panelSig();
+  if(force||sig!==state.panelSig){state.panelSig=sig;$('#panel').innerHTML=panelHTML()}
+}
+
+/* ---------- Sheet ---------- */
+var lastFocus=null;
+function openSheet(html){
+  flushCal();
+  lastFocus=document.activeElement;
+  $('#sheet').innerHTML=html;
+  $('#scrim').hidden=false;
+  $('#sheet').scrollTop=0;
+  document.body.style.overflow='hidden';
+  var t=$('#sheet [data-first]')||$('#sheet .x');
+  if(t)t.focus();
+}
+function closeSheet(){
+  flushCal();
+  $('#scrim').hidden=true;
+  $('#sheet').innerHTML='';
+  document.body.style.overflow='';
+  state.photoEdits={};state.photoDocs={};state.photoLoad=null;state.gallery=[];state.detailLoad=null;state.pdraft=null;
+  if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}
+}
+function toast(msg){
+  var t=$('#toast');t.textContent=msg;t.hidden=false;
+  clearTimeout(toast.t);toast.t=setTimeout(function(){t.hidden=true},2600);
+}
+function findP(id){return state.people.filter(function(p){return p.id===id})[0]}
+
+function chipList(arr){return (arr&&arr.length)?'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x)+'</span>'}).join('')+'</div>':'<span class="cl">–</span>'}
+function fact(l,v,unit){return (v===''||v==null)?'':'<div><dt>'+l+'</dt><dd>'+esc(v)+(unit?' '+unit:'')+'</dd></div>'}
+function copyRow(v){return v?'<div class="copyrow"><span>'+esc(v)+'</span><button type="button" class="btn small" data-act="copy" data-v="'+esc(v)+'">Kopieren</button></div>':''}
+
+function detailHTML(p,confirmDel,ro){
+  var age=ageOf(p);
+  var h='<div class="sh"><h2 id="sheetTitle">Profil</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
+  h+='<div class="dhead"><'+(p.thumb?'button type="button" class="ph zoomable" data-act="zoom" data-id="'+esc(p.id)+'" aria-label="Foto vergrößern"':'div class="ph"')+' id="dph">'+(p.thumb?'<img alt="Foto von '+esc(fullName(p))+'" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</'+(p.thumb?'button':'div')+'><div class="dn"><h2>'+esc(fullName(p))+'</h2><div class="tags">';
+  (p.typ||[]).forEach(function(t){h+='<span class="pill">'+esc(t)+'</span>'});
+  if(p.selbst)h+='<span class="cl">selbst eingetragen</span>';
+  h+='</div>';
+  if(p.ort||p.plz)h+='<p class="cl" style="margin:8px 0 0">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</p>';
+  if(p.agentur)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
+  h+='</div></div>';
+  if(p.hasFoto)h+='<div class="sec"><h3>Fotos</h3><div class="pthumbs" id="dphotos"><span class="cl">Fotos werden geladen …</span></div></div>';
+  h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
+  h+='<div class="sec"><h3>Aussehen und Maße</h3><dl class="facts">'+
+    fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact('Geburtsjahr',p.geburtsjahr)+
+    fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J')+
+    fact('Größe',p.groesse,'cm')+fact('Gewicht',p.gewicht,'kg')+fact('Konfektion',p.konfektion)+fact('Schuhgröße',p.schuh)+
+    fact('Haarfarbe',p.haarfarbe)+fact('Haarlänge',p.haarlaenge)+fact('Augenfarbe',p.augenfarbe)+fact('Bart',p.bart)+
+    fact('Tattoos',p.tattoos)+fact('Brille',p.brille?'ja':'')+'</dl></div>';
+  h+='<div class="sec"><h3>Sprachen</h3>'+chipList(p.sprachen)+'</div>';
+  if(p.dialekte)h+='<div class="sec"><h3>Dialekte</h3><div class="notes">'+esc(p.dialekte)+'</div></div>';
+  h+='<div class="sec"><h3>Fertigkeiten</h3>'+chipList(p.fertigkeiten)+'</div>';
+  h+='<div class="sec"><h3>Führerschein</h3>'+chipList(p.fuehrerschein)+'</div>';
+  if(p.erfahrung)h+='<div class="sec"><h3>Erfahrung</h3><div class="notes">'+esc(p.erfahrung)+'</div></div>';
+  h+='<div class="sec"><h3>Kontakt und Konditionen</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
+    (p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl>':'')+
+    (!p.telefon&&!p.email&&!p.instagram&&!p.social&&(p.gage==null||p.gage==='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
+  if(p.notizen)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(p.notizen)+'</div></div>';
+  h+='<div class="sec"><h3>Datenschutz</h3>'+(p.einwilligung?'<span class="cl">Einwilligung zur Speicherung liegt vor'+(p.einwilligungDatum?' (seit '+esc(p.einwilligungDatum)+')':'')+'.</span>':'<span class="warn">Einwilligung zur Speicherung fehlt. Hole sie ein, bevor du das Profil weitergibst.</span>')+'</div>';
+  if(ro){
+    var pr0=curProj(),st0=pr0?effSt(pr0,p.id):null;
+    h+=(st0?'<p style="margin:14px 0 0">'+statTag(st0)+'</p>':'')+'<div class="acts"><button type="button" class="btn" data-act="selbtn" data-id="'+esc(p.id)+'">'+(st0?(st0==='auswahl'?'Aus Auswahl entfernen':'In der Auswahl'):'Auswahl')+'</button><button type="button" class="btn primary" data-act="buchen" data-id="'+esc(p.id)+'"'+(st0==='gebucht'?' disabled':'')+'>'+(st0==='gebucht'?'Gebucht':'Buchen')+'</button><button type="button" class="btn" data-act="close">Schließen</button></div>';
+  }else if(canWrite){
+    h+='<div class="acts">'+(confirmDel?
+      '<button type="button" class="btn danger" data-act="delok" data-id="'+esc(p.id)+'">Endgültig löschen</button><button type="button" class="btn" data-act="open" data-id="'+esc(p.id)+'">Abbrechen</button>':
+      '<button type="button" class="btn primary" data-act="edit" data-id="'+esc(p.id)+'">Profil bearbeiten</button><button type="button" class="btn" data-act="avail" data-id="'+esc(p.id)+'">Verfügbarkeit</button><button type="button" class="btn danger" data-act="del" data-id="'+esc(p.id)+'">Löschen</button>')+'</div>';
+  }
+  return h;
+}
+
+function inp(id,label,val,attrs){return '<div class="fld"><label for="'+id+'">'+label+'</label><input id="'+id+'" value="'+esc(val==null?'':val)+'" '+(attrs||'')+'></div>'}
+function sel(id,label,opts,val){
+  var list=opts.slice();if(val&&list.indexOf(val)<0)list.push(val);
+  return '<div class="fld"><label for="'+id+'">'+label+'</label><select id="'+id+'"><option value="">–</option>'+list.map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select></div>';
+}
+function checks(name,opts,vals){
+  return '<div class="chips">'+opts.map(function(o){return '<label class="chip chk"><input type="checkbox" name="'+name+'" value="'+esc(o)+'"'+(vals.indexOf(o)>=0?' checked':'')+'><span>'+esc(o)+'</span></label>'}).join('')+'</div>';
+}
+function formHTML(p,self){
+  p=p||{};
+  var isNew=!p.id;
+  var gSp=GROUPS.filter(function(g){return g.k==='sprachen'})[0];
+  var gSk=GROUPS.filter(function(g){return g.k==='fertigkeiten'})[0];
+  var gFs=GROUPS.filter(function(g){return g.k==='fuehrerschein'})[0];
+  var h='<form id="form" novalidate'+(self?' data-self="1"':'')+'>'+(self?'':'<div class="sh"><h2 id="sheetTitle">'+(isNew?'Neues Profil':'Profil bearbeiten')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>');
+  h+='<fieldset><legend>Person</legend><div class="cols">'+
+    inp('f-vorname','Vorname',p.vorname,'autocomplete="off" data-first')+inp('f-nachname','Nachname',p.nachname,'autocomplete="off"')+
+    sel('f-geschlecht','Geschlecht',GESCHLECHT,p.geschlecht)+
+    inp('f-geburtsjahr','Geburtsjahr',p.geburtsjahr,'inputmode="numeric" placeholder="z. B. 1988"')+
+    inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+
+    inp('f-plz','Postleitzahl',p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort',p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
+    '</div><div class="fld" style="margin-top:12px"><div class="fl">Kategorie</div>'+checks('typ',TYPEN,p.typ||[])+'</div>'+
+    '<div class="fld" style="margin-top:12px"><div class="fl">Fotos <span class="hint">Portrait, Ganzkörper und Profilansicht, dazu bis zu 5 weitere</span></div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
+  h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
+    inp('f-groesse','Größe (cm)',p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
+    sel('f-konfektion','Konfektionsgröße',KONF,p.konfektion)+inp('f-schuh','Schuhgröße (EU)',p.schuh,'inputmode="decimal"')+
+    sel('f-haarfarbe','Haarfarbe',HAARFARBE,p.haarfarbe)+sel('f-haarlaenge','Haarlänge',HAARLAENGE,p.haarlaenge)+
+    sel('f-augenfarbe','Augenfarbe',AUGEN,p.augenfarbe)+sel('f-bart','Bart',BART,p.bart)+
+    sel('f-tattoos','Tattoos',TATTOOS,p.tattoos)+
+    '</div><label class="consent" style="margin-top:12px"><input type="checkbox" id="f-brille"'+(p.brille?' checked':'')+'><span>Trägt eine Brille</span></label></fieldset>';
+  h+='<fieldset><legend>Können</legend>'+
+    '<div class="fld"><div class="fl">Sprachen</div>'+checks('sprachen',optsFor(gSp),p.sprachen||[])+'</div>'+
+    '<div class="fld" style="margin-top:8px">'+'<label for="f-sprachenx">Weitere Sprachen, durch Komma getrennt</label><input id="f-sprachenx" autocomplete="off"></div>'+
+    inp('f-dialekte','Dialekte',p.dialekte,'autocomplete="off" style="margin-top:0"')+
+    '<div class="fld" style="margin-top:12px"><div class="fl">Fertigkeiten</div>'+checks('fertigkeiten',optsFor(gSk),p.fertigkeiten||[])+'</div>'+
+    '<div class="fld" style="margin-top:8px"><label for="f-skillsx">Weitere Fertigkeiten, durch Komma getrennt</label><input id="f-skillsx" autocomplete="off"></div>'+
+    '<div class="fld" style="margin-top:12px"><div class="fl">Führerschein</div>'+checks('fuehrerschein',optsFor(gFs),p.fuehrerschein||[])+'</div>'+
+    '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div></fieldset>';
+  h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
+    inp('f-telefon','Telefon',p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',p.email,'type="text" inputmode="email" autocomplete="off"')+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
+    (self?'':inp('f-gage','Tagesgage (€)',p.gage,'inputmode="decimal"'))+'</div>'+
+    (self?'<p class="cl" style="margin:8px 0 0">Deine Kontaktdaten sieht nur die Agentur.</p>':'<div class="fld" style="margin-top:12px"><label for="f-notizen">Notizen</label><textarea id="f-notizen">'+esc(p.notizen)+'</textarea></div>')+'</fieldset>';
+  if(self)h+='<fieldset><legend>Wann hast du Zeit?</legend>'+calHTML(p,true)+'</fieldset>';
+  h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
+  h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="saveBtn" data-id="'+esc(p.id||'')+'">'+(self?'Profil speichern':'Speichern')+'</button>'+(self?(p.id?'<button type="button" class="btn danger" data-act="selfdel">'+(state.confirmSelf?'Wirklich löschen':'Mein Profil löschen')+'</button>':''):'<button type="button" class="btn" data-act="close">Abbrechen</button>')+'</div></form>';
+  return h;
+}
+
+/* ---------- Form handling ---------- */
+function loadImage(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){URL.revokeObjectURL(url);res(img)};
+    img.onerror=function(){
+      URL.revokeObjectURL(url);
+      var fr=new FileReader();
+      fr.onload=function(){var i2=new Image();i2.onload=function(){res(i2)};i2.onerror=function(){rej(new Error('decode'))};i2.src=fr.result};
+      fr.onerror=function(){rej(new Error('read'))};
+      fr.readAsDataURL(file);
+    };
+    img.src=url;
+  });
+}
+function scaled(img,max,q){
+  var s=Math.min(1,max/Math.max(img.width,img.height));
+  var c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*s));c.height=Math.max(1,Math.round(img.height*s));
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',q);
+}
+function checked(name){return Array.prototype.map.call(document.querySelectorAll('#form input[name="'+name+'"]:checked'),function(i){return i.value})}
+function extra(id){var e=$('#'+id);return (e?e.value:'').split(',').map(function(s){return s.trim()}).filter(Boolean)}
+function uniq(a){return a.filter(function(x,i){return a.indexOf(x)===i})}
+function val(id){var e=$('#'+id);return e?e.value.trim():''}
+function readForm(self){
+  var d={
+    vorname:val('f-vorname'),nachname:val('f-nachname'),geschlecht:val('f-geschlecht'),
+    geburtsjahr:num(val('f-geburtsjahr')),spielVon:num(val('f-spielvon')),spielBis:num(val('f-spielbis')),
+    plz:val('f-plz'),ort:val('f-ort'),agentur:val('f-agentur'),typ:checked('typ'),
+    groesse:num(val('f-groesse')),gewicht:num(val('f-gewicht')),konfektion:val('f-konfektion'),schuh:num(val('f-schuh')),
+    haarfarbe:val('f-haarfarbe'),haarlaenge:val('f-haarlaenge'),augenfarbe:val('f-augenfarbe'),bart:val('f-bart'),tattoos:val('f-tattoos'),
+    brille:$('#f-brille').checked,
+    sprachen:uniq(checked('sprachen').concat(extra('f-sprachenx'))),dialekte:val('f-dialekte'),
+    fertigkeiten:uniq(checked('fertigkeiten').concat(extra('f-skillsx'))),fuehrerschein:checked('fuehrerschein'),
+    erfahrung:val('f-erfahrung'),telefon:val('f-telefon'),email:val('f-email'),instagram:val('f-instagram'),social:val('f-social'),gage:num(val('f-gage')),
+    notizen:val('f-notizen'),einwilligung:$('#f-einw').checked
+  };
+  if(self){delete d.agentur;delete d.gage;delete d.notizen}
+  return d;
+}
+function baseRec(old,d){
+  var rec=Object.assign({},old||{});
+  delete rec.id;delete rec.verfuegbar;
+  Object.keys(d).forEach(function(k){delete rec[k]});
+  Object.keys(d).forEach(function(k){var v=d[k];if(v===null||v==='')return;rec[k]=v});
+  return rec;
+}
+async function persistPhotos(pid,old,rec){
+  var edits=state.photoEdits,docs=state.photoDocs,finalThumbs={};
+  for(var si=0;si<ALLSLOTS.length;si++){
+    var k=ALLSLOTS[si].k,ed=edits[k];
+    if(ed&&(ed.full||ed.remove)){
+      if(ed.full){await db.doc('photos/'+pid+'/s/'+k).set({slot:k,thumb:ed.thumb,data:ed.full});finalThumbs[k]=ed.thumb}
+      else await db.doc('photos/'+pid+'/s/'+k).delete();
+    }else if(docs[k]){finalThumbs[k]=docs[k].thumb}
+  }
+  var fkeys=Object.keys(finalThumbs);
+  var main=finalThumbs.portrait||finalThumbs.ganzkoerper||finalThumbs.profil||finalThumbs[fkeys[0]]||'';
+  var anyRemove=Object.keys(edits).some(function(x){return edits[x].remove});
+  if(!fkeys.length&&old&&old.hasFoto&&!Object.keys(docs).length&&!anyRemove)main=old.thumb||'';
+  delete rec.hasFoto;delete rec.thumb;
+  if(main||fkeys.length){rec.hasFoto=true;if(main)rec.thumb=main}
+}
+async function save(id){
+  var err=$('#ferr'),btn=$('#saveBtn');
+  var d=readForm();
+  if(!d.vorname&&!d.nachname){err.textContent='Trage mindestens einen Vor- oder Nachnamen ein.';$('#f-vorname').focus();return}
+  if(d.geburtsjahr!=null&&(d.geburtsjahr<1900||d.geburtsjahr>YEAR)){err.textContent='Das Geburtsjahr muss zwischen 1900 und '+YEAR+' liegen.';$('#f-geburtsjahr').focus();return}
+  if(!d.typ.length){err.textContent='Wähle mindestens eine Kategorie: Schauspieler oder Komparse.';return}
+  err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
+  try{
+    var old=id?findP(id):null;
+    var ref=id?db.doc('people/'+id):db.collection('people').doc();
+    var rec=baseRec(old,d);
+    rec.createdAt=old&&old.createdAt?old.createdAt:Date.now();
+    rec.updatedAt=Date.now();
+    if(d.einwilligung){rec.einwilligungDatum=(old&&old.einwilligungDatum)||new Date().toISOString().slice(0,10)}
+    else delete rec.einwilligungDatum;
+    if(state.photoLoad){try{await state.photoLoad}catch(e){}}
+    await persistPhotos(ref.id,old,rec);
+    await ref.set(rec);
+    toast(id?'Profil gespeichert':'Profil angelegt');
+    var saved=Object.assign({id:ref.id},rec);
+    closeSheet();
+    if(!id){/* snapshot liefert das neue Profil */}
+    void saved;
+  }catch(e){
+    btn.disabled=false;btn.textContent='Speichern';
+    err.textContent=(e&&e.code==='quota_exceeded')?'Der Speicher der Datenbank ist voll. Lösche alte Profile und versuche es erneut.':'Speichern hat nicht geklappt. Prüfe deine Verbindung und versuche es noch einmal.';
+  }
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-act]');
+  if(e.target.id==='scrim'){closeSheet();return}
+  if(!t)return;
+  var act=t.dataset.act,id=t.dataset.id;
+  if(act==='filters'){var pn=$('#panel');pn.hidden=!pn.hidden;t.setAttribute('aria-expanded',String(!pn.hidden));if(!pn.hidden)refreshPanel(true)}
+  else if(act==='typ'){state.typ=t.dataset.v;Array.prototype.forEach.call(document.querySelectorAll('.bar .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===state.typ))});renderList()}
+  else if(act==='chip'){var s=state.f.sets[t.dataset.g],v=t.dataset.v;if(s.has(v))s.delete(v);else s.add(v);t.classList.toggle('on',s.has(v));t.setAttribute('aria-pressed',String(s.has(v)));renderList()}
+  else if(act==='toggle'){var k=t.dataset.t;state.f.t[k]=!state.f.t[k];t.classList.toggle('on',state.f.t[k]);t.setAttribute('aria-pressed',String(state.f.t[k]));renderList()}
+  else if(act==='clear'){state.f=newFilters();state.q='';$('#q').value='';refreshPanel(true);renderList()}
+  else if(act==='open'){var p=findP(id);if(p){var ro=!!t.closest('#v-proj');openSheet(detailHTML(p,false,ro));startDetail(p)}}
+  else if(act==='avail'){var ap=findP(id),sec=$('#availsec');if(ap&&sec&&state.cal){sec.innerHTML='<h3>Verfügbarkeit ändern</h3>'+calHTML(ap,true);sec.scrollIntoView({block:'start'});t.hidden=true}}
+  else if(act==='buchen'){bookSel(id);closeSheet()}
+  else if(act==='selbtn'){addSel(id);var qp=findP(id);if(qp){var k0=curProj(),s0=k0?effSt(k0,id):null;t.textContent=s0?(s0==='auswahl'?'Aus Auswahl entfernen':'In der Auswahl'):'Auswahl'}}
+  else if(act==='send'){sendSel()}
+  else if(act==='unsel'){removeSel(id)}
+  else if(act==='kdec'){kDecide(t.dataset.key,t.dataset.s)}
+  else if(act==='kzoom'){kZoom(t.dataset.key)}
+  else if(act==='close'){closeSheet()}
+  else if(act==='zoom'){openGallery(0)}
+  else if(act==='gal'){openGallery(parseInt(t.dataset.i,10)||0)}
+  else if(act==='lbprev'){showGal(state.galIdx-1)}
+  else if(act==='lbnext'){showGal(state.galIdx+1)}
+  else if(act==='calday'){var cc=state.cal;if(cc&&!t.disabled){var dd=t.dataset.d;if(cc.set.has(dd))cc.set.delete(dd);else cc.set.add(dd);calChanged()}}
+  else if(act==='calweek'){var c2=state.cal;if(c2&&!t.disabled){var wd=(t.dataset.days||'').split(',').filter(function(x){return x>=todayStr()});var all=wd.length&&wd.every(function(x){return c2.set.has(x)});wd.forEach(function(x){if(all)c2.set.delete(x);else c2.set.add(x)});calChanged()}}
+  else if(act==='lbclose'){closeZoom()}
+  else if(act==='add'){if(canWrite){resetPhotoState();openSheet(formHTML(null))}}
+  else if(act==='edit'){var q=findP(id);if(q&&canWrite){resetPhotoState();openSheet(formHTML(q));if(q.hasFoto){state.photoLoad=loadPhotos(q).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}}}
+  else if(act==='del'){var r=findP(id);if(r){openSheet(detailHTML(r,true));startDetail(r)}}
+  else if(act==='delok'){removePerson(id)}
+  else if(act==='copy'){copyText(t.dataset.v)}
+  else if(act==='view'){setView(t.dataset.v)}
+  else if(act==='kpedit'){state.pid=id;var kp=curProj();if(kp)openProjForm(kp)}
+  else if(act==='kpdel'){if(state.kDelId!==id){state.kDelId=id;renderKunde()}else{state.pid=id;removeProj()}}
+  else if(act==='kpno'){state.kDelId='';renderKunde()}
+  else if(act==='selfdel'){deleteSelf()}
+  else if(act==='pnew'){openProjForm(null)}
+  else if(act==='pedit'){var cp0=curProj();if(cp0)openProjForm(cp0)}
+  else if(act==='pdel'){state.confirmDelP=true;renderProj()}
+  else if(act==='pdelno'){state.confirmDelP=false;renderProj()}
+  else if(act==='pdelok'){removeProj()}
+  else if(act==='prole'){state.roleSel=t.dataset.r||'';renderProj()}
+  else if(act==='merk'){addSel(id)}
+  else if(act==='ptadd'){state.pdraft.tage.push({von:'',bis:''});rerenderProjForm('pt-v'+(state.pdraft.tage.length-1))}
+  else if(act==='ptdel'){state.pdraft.tage.splice(+t.dataset.i,1);if(!state.pdraft.tage.length)state.pdraft.tage.push({von:'',bis:''});rerenderProjForm()}
+  else if(act==='pradd'){state.pdraft.rollen.push({id:'r'+Date.now().toString(36)+state.pdraft.rollen.length});rerenderProjForm('pr'+(state.pdraft.rollen.length-1)+'name')}
+  else if(act==='prdel'){state.pdraft.rollen.splice(+t.dataset.i,1);rerenderProjForm()}
+  else if(act==='rmphoto'){state.photoEdits[t.dataset.slot]={remove:true};refreshPhotoGrid()}
+  else if(act==='delex'){
+    if(!state.confirmEx){state.confirmEx=true;renderList();return}
+    removeExamples();
+  }
+});
+document.addEventListener('keydown',function(e){
+  var lbOpen=!$('#lb').hidden;
+  if(lbOpen&&e.key==='ArrowLeft'){showGal(state.galIdx-1);return}
+  if(lbOpen&&e.key==='ArrowRight'){showGal(state.galIdx+1);return}
+  if(e.key!=='Escape')return;
+  if(lbOpen){closeZoom();return}
+  if(!$('#scrim').hidden)closeSheet();
+});
+document.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.dataset&&t.dataset.pf&&state.pdraft){state.pdraft[t.dataset.pf]=t.type==='checkbox'?t.checked:t.value}
+  else if(t.dataset&&t.dataset.pt!=null&&t.dataset.pt!==''&&state.pdraft){state.pdraft.tage[+t.dataset.pt][t.dataset.k]=t.value}
+  else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
+  else if(t.id==='q'){state.q=t.value.trim();renderList()}
+  else if(t.dataset&&t.dataset.r){state.f.r[t.dataset.r][t.dataset.b]=t.value.trim();renderList()}
+  else if(t.dataset&&t.dataset.spiel){state.f.spiel=t.value.trim();renderList()}
+  else if(t.dataset&&t.dataset.plz){state.f.plz=t.value.trim();renderList()}
+  else if(t.dataset&&t.dataset.dfrom){state.f.dFrom=t.value;renderList()}
+  else if(t.dataset&&t.dataset.dto){state.f.dTo=t.value;renderList()}
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='sort'){state.sort=t.value;renderList()}
+  else if(t.id==='psel'){state.pid=t.value;state.roleSel='';state.confirmDelP=false;renderProj()}
+  else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
+  else if(t.dataset&&t.dataset.pt!=null&&t.dataset.pt!==''&&state.pdraft){state.pdraft.tage[+t.dataset.pt][t.dataset.k]=t.value}
+  else if(t.id&&t.id.indexOf('f-photo-')===0&&t.files&&t.files[0]){
+    var slot=t.id.slice(8),file=t.files[0],st=$('#pstat');
+    st.style.color='';st.textContent='Foto wird verarbeitet …';
+    loadImage(file).then(function(img){
+      state.photoEdits[slot]={full:scaled(img,600,.78),thumb:scaled(img,160,.72)};
+      refreshPhotoGrid();
+      st.textContent='Foto übernommen. Es wird gespeichert, wenn du das Profil speicherst.';
+    }).catch(function(){
+      st.style.color='var(--accent)';
+      st.textContent='Dieses Bild lässt sich nicht lesen. Nimm ein JPG oder PNG, oder mache das Foto neu.';
+    });
+  }
+});
+document.addEventListener('submit',function(e){
+  if(e.target.id==='form'){e.preventDefault();if(e.target.dataset.self)saveSelf();else save($('#saveBtn').dataset.id||'')}
+  else if(e.target.id==='pform'){e.preventDefault();saveProj()}
+});
+
+function copyText(v){
+  var ok=function(){toast('Kopiert')};
+  var fb=function(){
+    var ta=document.createElement('textarea');ta.value=v;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');ok()}catch(x){toast('Markiere den Text und kopiere ihn von Hand')}
+    document.body.removeChild(ta);
+  };
+  try{navigator.clipboard.writeText(v).then(ok,fb)}catch(x){fb()}
+}
+function closeZoom(){var lb=$('#lb');lb.hidden=true;$('#lbimg').removeAttribute('src')}
+function showGal(i){
+  var g=state.gallery;if(!g.length)return;
+  state.galIdx=((i%g.length)+g.length)%g.length;
+  var it=g[state.galIdx];
+  $('#lbimg').src=it.src;$('#lbimg').alt=it.label;
+  $('#lbcap').textContent=it.label+(g.length>1?' ('+(state.galIdx+1)+' von '+g.length+')':'');
+  $('#lb').classList.toggle('single',g.length<2);
+}
+async function openGallery(i){
+  if(state.detailLoad){try{await state.detailLoad}catch(e){}}
+  if(!state.gallery.length){
+    var cp=state.cal&&findP(state.cal.id);
+    if(cp&&cp.thumb)state.gallery=[{label:'Foto',src:cp.thumb,thumb:cp.thumb}];else return;
+  }
+  $('#lb').hidden=false;showGal(i);
+}
+function resetPhotoState(){state.photoEdits={};state.photoDocs={};state.photoLoad=null}
+function photoTile(s){
+  var ex=state.photoDocs[s.k],ed=state.photoEdits[s.k];
+  var src=ed?(ed.thumb||''):(ex&&ex.thumb||'');
+  return '<div class="ptile"><div class="ph">'+(src?'<img alt="" src="'+esc(src)+'">':'+')+'</div><div class="pl">'+esc(s.l)+'</div>'+
+    '<label class="btn small" for="f-photo-'+s.k+'">'+(src?'Ersetzen':'Wählen')+'</label><input type="file" id="f-photo-'+s.k+'" accept="image/*" class="vh">'+
+    (src?'<button type="button" class="btn small" data-act="rmphoto" data-slot="'+s.k+'">Entfernen</button>':'')+'</div>';
+}
+function photoGridHTML(){return ALLSLOTS.map(photoTile).join('')}
+function refreshPhotoGrid(){var g=$('#pgrid');if(g)g.innerHTML=photoGridHTML()}
+async function loadPhotos(p){
+  var map={};
+  if(!db||!p.hasFoto)return map;
+  try{
+    var qs=await db.collection('photos/'+p.id+'/s').get();
+    qs.docs.forEach(function(d){var o=d.data()||{};if(o.slot)map[o.slot]={thumb:o.thumb,data:o.data}});
+  }catch(e){}
+  return map;
+}
+async function deletePhotos(id){
+  try{
+    var n=await db.collection('photos/'+id+'/s').get();
+    for(var a=0;a<n.docs.length;a++)await db.doc('photos/'+id+'/s/'+n.docs[a].id).delete();
+  }catch(e){}
+}
+function startDetail(p){
+  var today=todayStr();
+  state.cal={id:p.id,set:new Set((p.verfDates||[]).filter(function(x){return x>=today})),timer:null,busy:false,dirty:false};
+  state.gallery=[];
+  var tok=p.id;
+  state.detailLoad=loadPhotos(p).then(function(map){
+    if(!state.cal||state.cal.id!==tok)return;
+    state.gallery=ALLSLOTS.filter(function(s){return map[s.k]}).map(function(s){return {label:s.l,thumb:map[s.k].thumb,src:map[s.k].data||map[s.k].thumb}});
+    var el=$('#dphotos');
+    if(el)el.innerHTML=state.gallery.length?state.gallery.map(function(g,i){
+      return '<button type="button" class="pth" data-act="gal" data-i="'+i+'" aria-label="'+esc(g.label)+' vergrößern"><div class="ph"><img alt="" src="'+esc(g.thumb||g.src)+'"></div><span>'+esc(g.label)+'</span></button>';
+    }).join(''):'<span class="cl">Keine Fotos gefunden.</span>';
+  });
+}
+
+/* ---------- Kalender ---------- */
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function todayStr(){return ymd(new Date())}
+function weekStart(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+function isoWeek(d){
+  var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  var dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);
+  var y=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return Math.ceil(((t-y)/86400000+1)/7);
+}
+function daysBetween(a,b){
+  if(!b||b<a)b=a;
+  var q=a.split('-'),d=new Date(+q[0],+q[1]-1,+q[2]),out=[];
+  if(isNaN(d.getTime()))return out;
+  for(var i=0;i<120;i++){var s=ymd(d);if(s>b)break;out.push(s);d.setDate(d.getDate()+1)}
+  return out;
+}
+function nextFree(p){var t=todayStr();var a=(p.verfDates||[]).filter(function(x){return x>=t}).sort();return a[0]||null}
+function fmtDM(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'}
+function calDaysOfWeek(w){var st=weekStart(new Date()),out=[];for(var i=0;i<7;i++){var d=new Date(st);d.setDate(st.getDate()+w*7+i);out.push(ymd(d))}return out}
+function calHTML(p,editable){
+  var set=new Set(p.verfDates||[]),today=todayStr();
+  var start=weekStart(new Date()),end=new Date(start);
+  end.setDate(end.getDate()+WEEKS*7-1);
+  var startS=ymd(start),endS=ymd(end);
+  var h='<div class="cal" id="cal">';
+  var m=new Date(start.getFullYear(),start.getMonth(),1);
+  while(m<=end){
+    var y=m.getFullYear(),mo=m.getMonth(),last=new Date(y,mo+1,0);
+    h+='<div class="calm"><div class="calt">'+MONTHS[mo]+' '+y+'</div><div class="calh"><span>KW</span>'+['Mo','Di','Mi','Do','Fr','Sa','So'].map(function(x){return '<span>'+x+'</span>'}).join('')+'</div>';
+    var ws=weekStart(new Date(y,mo,1));
+    while(ws<=last){
+      var cells='',days=[];
+      for(var i=0;i<7;i++){
+        var d=new Date(ws);d.setDate(ws.getDate()+i);
+        var sd=ymd(d);
+        if(d.getMonth()!==mo||sd<startS||sd>endS){cells+='<span class="cd gap" aria-hidden="true"></span>';continue}
+        days.push(sd);
+        var past=sd<today,on=set.has(sd)&&!past;
+        cells+='<button type="button" class="cd'+(on?' on':'')+(past?' past':'')+(i>=5?' we':'')+(sd===today?' today':'')+'" data-act="calday" data-d="'+sd+'" aria-pressed="'+on+'" aria-label="'+d.getDate()+'. '+MONTHS[mo]+' '+y+(on?', verfügbar':'')+'"'+((past||!editable)?' disabled':'')+'>'+d.getDate()+'</button>';
+      }
+      if(days.length){
+        h+='<div class="calr"><button type="button" class="kw" data-act="calweek" data-days="'+days.join(',')+'"'+(editable?'':' disabled')+' title="Alle Tage dieser Zeile umschalten">'+isoWeek(ws)+'</button>'+cells+'</div>';
+      }
+      ws.setDate(ws.getDate()+7);
+    }
+    h+='</div>';
+    m=new Date(y,mo+1,1);
+  }
+  h+='</div><p class="cl calnote">Grün bedeutet verfügbar. '+(editable?'Tippe auf einen Tag, oder auf die Kalenderwoche links, um die Tage dieser Zeile umzuschalten. ':'')+'Der Kalender zeigt die laufende Woche und die nächsten 8 Wochen und rückt jeden Montag um eine Woche weiter.</p><div class="cl" id="calstat" role="status"></div>';
+  return h;
+}
+function calSync(){
+  var c=state.cal;
+  Array.prototype.forEach.call(document.querySelectorAll('#cal button.cd'),function(b){
+    var on=!!c&&c.set.has(b.dataset.d)&&!b.classList.contains('past');
+    b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));
+  });
+}
+function calStat(msg,bad){var el=$('#calstat');if(el){el.textContent=msg;el.style.color=bad?'var(--accent)':''}}
+function calChanged(){
+  var c=state.cal;if(!c)return;
+  calSync();
+  if(c.noAuto){calStat('Wird mit „Profil speichern“ übernommen.');return}
+  calStat('Änderung wird gespeichert …');
+  clearTimeout(c.timer);c.timer=setTimeout(function(){c.timer=null;saveCal(c)},700);
+}
+async function saveCal(c){
+  if(c.busy){c.dirty=true;return}
+  c.busy=true;c.dirty=false;
+  try{
+    await db.doc('people/'+c.id).update({verfDates:Array.from(c.set).sort(),updatedAt:Date.now()});
+    calStat('Verfügbarkeit gespeichert');
+  }catch(e){calStat('Speichern hat nicht geklappt. Tippe noch einmal auf einen Tag.',true)}
+  c.busy=false;
+  if(c.dirty)saveCal(c);
+}
+function flushCal(){
+  var c=state.cal;state.cal=null;
+  if(c&&c.timer&&!c.noAuto){clearTimeout(c.timer);c.timer=null;saveCal(c)}
+}
+async function removePerson(id){
+  try{
+    var p=findP(id);
+    await db.doc('people/'+id).delete();
+    if(p&&p.hasFoto)await deletePhotos(id);
+    closeSheet();toast('Profil gelöscht');
+  }catch(e){toast('Löschen hat nicht geklappt. Versuche es noch einmal.')}
+}
+async function removeExamples(){
+  try{
+    var ex=state.people.filter(function(p){return p.example});
+    for(var i=0;i<ex.length;i++){
+      await db.doc('people/'+ex[i].id).delete();
+      if(ex[i].hasFoto)await deletePhotos(ex[i].id);
+    }
+    state.confirmEx=false;toast('Beispielprofile gelöscht');
+  }catch(e){toast('Löschen hat nicht geklappt. Versuche es noch einmal.')}
+}
+
+/* ---------- Masken ---------- */
+function fmtDMY(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)}
+function tabsFor(r){return r==='admin'?['kartei','proj']:r==='kunde'?['kunde']:['self']}
+function setView(v){
+  var tabs=tabsFor(role);
+  if(tabs.indexOf(v)<0)v=tabs[0];
+  flushCal();
+  state.view=v;
+  ['kartei','proj','self','kunde'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
+  Array.prototype.forEach.call(document.querySelectorAll('#nav .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));b.hidden=tabs.indexOf(b.dataset.v)<0});
+  $('#nav').hidden=tabs.length<2;
+  $('#topact').hidden=!(isAdmin&&v==='kartei');
+  if(v==='kartei')renderList();
+  else if(v==='proj')renderProj();
+  else if(v==='kunde')renderKunde();
+  else renderSelf();
+}
+function calEndStr(){var e=weekStart(new Date());e.setDate(e.getDate()+WEEKS*7-1);return ymd(e)}
+
+/* ---------- Mein Profil ---------- */
+async function renderSelf(note){
+  var host=$('#v-self');
+  $('#count').textContent='Dein Profil für die Agentur';
+  if(!db||state.nodb){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2><p class="cl">Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';return}
+  if(!uid){host.innerHTML='<div class="selfwrap"><h2>Bitte anmelden</h2><p class="cl">Bitte melde dich an.</p></div>';return}
+  host.innerHTML='<div class="selfwrap"><p class="cl">Dein Profil wird geladen …</p></div>';
+  var p=null;
+  try{var sn=await db.doc('people/'+uid).get();if(sn.exists)p=Object.assign({},sn.data()||{},{id:uid})}catch(e){}
+  if(state.view!=='self')return;
+  state.selfP=p;resetPhotoState();
+  state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
+  var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||{email:myEmail,vorname:(myName||'').split(' ')[0]||'',nachname:(myName||'').split(' ').slice(1).join(' ')},true)+'</div></div>';
+  var anf=await loadAnfragen();
+  if(state.view!=='self')return;
+  host.innerHTML=anf+h;
+  if(p&&p.hasFoto){state.photoLoad=loadPhotos(p).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}
+}
+async function saveSelf(){
+  var err=$('#ferr'),btn=$('#saveBtn');
+  var d=readForm(true);
+  if(!d.vorname&&!d.nachname){err.textContent='Trage deinen Namen ein.';$('#f-vorname').focus();return}
+  if(d.geburtsjahr!=null&&(d.geburtsjahr<1900||d.geburtsjahr>YEAR)){err.textContent='Das Geburtsjahr muss zwischen 1900 und '+YEAR+' liegen.';$('#f-geburtsjahr').focus();return}
+  if(!d.typ.length){err.textContent='Wähle Schauspieler, Komparse oder beides.';return}
+  if(!d.telefon&&!d.email){err.textContent='Trage Telefon oder E-Mail ein, damit dich die Agentur erreichen kann.';$('#f-telefon').focus();return}
+  if(!d.einwilligung){err.textContent='Ohne deine Einwilligung darf das Profil nicht gespeichert werden.';return}
+  if(!uid){err.textContent='Du bist nicht angemeldet.';return}
+  err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
+  try{
+    var ref=db.doc('people/'+uid),old=null;
+    try{var sn=await ref.get();if(sn.exists)old=Object.assign({},sn.data()||{})}catch(e){}
+    var rec=baseRec(old,d);
+    rec.selbst=true;rec.uid=uid;
+    rec.createdAt=old&&old.createdAt?old.createdAt:Date.now();rec.updatedAt=Date.now();
+    rec.einwilligungDatum=(old&&old.einwilligungDatum)||new Date().toISOString().slice(0,10);
+    var cs=state.cal&&state.cal.set?state.cal.set:new Set(),t=todayStr();
+    rec.verfDates=Array.from(cs).filter(function(x){return x>=t}).sort();
+    if(state.photoLoad){try{await state.photoLoad}catch(e){}}
+    await persistPhotos(uid,old,rec);
+    await ref.set(rec);
+    state.confirmSelf=false;
+    renderSelf('Gespeichert. Danke, die Agentur sieht dein Profil jetzt.');
+    window.scrollTo(0,0);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Profil speichern';
+    err.textContent='Speichern hat nicht geklappt. Prüfe deine Verbindung und versuche es noch einmal.';
+  }
+}
+async function deleteSelf(){
+  if(!state.confirmSelf){state.confirmSelf=true;var b=$('[data-act="selfdel"]');if(b)b.textContent='Wirklich löschen';return}
+  try{
+    await deletePhotos(uid);
+    await db.doc('people/'+uid).delete();
+    state.confirmSelf=false;
+    renderSelf('Dein Profil wurde gelöscht.');
+  }catch(e){toast('Löschen hat nicht geklappt. Versuche es noch einmal.')}
+}
+
+/* ---------- Projekte ---------- */
+var ROLEF=[
+ {k:'name',l:'Rollenname',t:'text',ph:'z. B. Passant, Kommissar'},
+ {k:'anzahl',l:'Anzahl',t:'num'},
+ {k:'typ',l:'Kategorie',t:'sel',o:TYPEN},
+ {k:'geschlecht',l:'Geschlecht',t:'sel',o:GESCHLECHT},
+ {k:'alterVon',l:'Alter von',t:'num'},{k:'alterBis',l:'Alter bis',t:'num'},
+ {k:'groesseVon',l:'Größe von (cm)',t:'num'},{k:'groesseBis',l:'Größe bis (cm)',t:'num'},
+ {k:'haarfarbe',l:'Haarfarbe',t:'sel',o:HAARFARBE},{k:'bart',l:'Bart',t:'sel',o:BART},
+ {k:'plz',l:'PLZ beginnt mit',t:'text'},
+ {k:'sprachen',l:'Sprachen, Komma',t:'list'},{k:'fertigkeiten',l:'Fertigkeiten, Komma',t:'list'},{k:'fuehrerschein',l:'Führerschein, Komma',t:'list'},
+ {k:'beschr',l:'Beschreibung',t:'text'}
+];
+function curProj(){return state.projects.filter(function(x){return x.id===state.pid})[0]||null}
+function projDays(pr){var s=new Set();(pr.tage||[]).forEach(function(t){if(t.von)daysBetween(t.von,t.bis||t.von).forEach(function(x){s.add(x)})});return Array.from(s).sort()}
+function roleCrit(r){
+  var out=[];
+  if(r.typ)out.push(r.typ);if(r.geschlecht)out.push(r.geschlecht);
+  if(r.alterVon!=null||r.alterBis!=null)out.push('Alter '+(r.alterVon!=null?r.alterVon:'?')+'–'+(r.alterBis!=null?r.alterBis:'?'));
+  if(r.groesseVon!=null||r.groesseBis!=null)out.push('Größe '+(r.groesseVon!=null?r.groesseVon:'?')+'–'+(r.groesseBis!=null?r.groesseBis:'?')+' cm');
+  if(r.haarfarbe)out.push('Haar '+r.haarfarbe);if(r.bart)out.push(r.bart);if(r.plz)out.push('PLZ '+r.plz+'…');
+  (r.sprachen||[]).concat(r.fertigkeiten||[],r.fuehrerschein||[]).forEach(function(x){out.push(x)});
+  return out;
+}
+function roleMatch(p,r){
+  if(r.typ&&(p.typ||[]).indexOf(r.typ)<0)return false;
+  if(r.geschlecht&&p.geschlecht!==r.geschlecht)return false;
+  if(r.alterVon!=null||r.alterBis!=null){
+    var lo=r.alterVon!=null?r.alterVon:0,hi=r.alterBis!=null?r.alterBis:200;
+    var a=p.spielVon!=null?p.spielVon:ageOf(p),b=p.spielBis!=null?p.spielBis:(p.spielVon!=null?p.spielVon:ageOf(p));
+    if(a==null||b==null||b<lo||a>hi)return false;
+  }
+  if(r.groesseVon!=null&&!(p.groesse>=r.groesseVon))return false;
+  if(r.groesseBis!=null&&!(p.groesse<=r.groesseBis))return false;
+  if(r.haarfarbe&&p.haarfarbe!==r.haarfarbe)return false;
+  if(r.bart&&p.bart!==r.bart)return false;
+  if(r.plz&&String(p.plz||'').indexOf(r.plz)!==0)return false;
+  var ok=true;
+  [['sprachen'],['fertigkeiten'],['fuehrerschein']].forEach(function(x){
+    var k=x[0],need=r[k]||[],have=(p[k]||[]).map(function(y){return String(y).toLowerCase()});
+    need.forEach(function(n){if(have.indexOf(String(n).toLowerCase())<0)ok=false});
+  });
+  return ok;
+}
+function availFor(p,days){
+  var t=todayStr(),end=calEndStr(),set=new Set(p.verfDates||[]);
+  var rel=days.filter(function(d){return d>=t}),inw=rel.filter(function(d){return d<=end});
+  var free=inw.filter(function(d){return set.has(d)}).length;
+  return {rel:rel.length,inw:inw.length,free:free,out:rel.length-inw.length};
+}
+function renderProj(){
+  var host=$('#v-proj');
+  var list=state.projects.slice().sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')});
+  if(!list.some(function(x){return x.id===state.pid}))state.pid=list.length?list[0].id:'';
+  var pr=curProj();
+  $('#count').textContent=list.length?list.length+' Projekt'+(list.length===1?'':'e'):'Noch keine Projekte';
+  var h='<div class="pbar"><select id="psel" aria-label="Projekt wählen">'+(list.length?list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===state.pid?' selected':'')+'>'+esc(x.name||'Ohne Namen')+'</option>'}).join(''):'<option value="">Kein Projekt vorhanden</option>')+'</select><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div>';
+  if(!state.loaded){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Wird geladen</h3></div>';return}
+  if(!pr){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Lege ein Projekt mit Drehtagen und Rollen an. Danach siehst du sofort, wer verfügbar ist und passt.</p></div>';return}
+  var days=projDays(pr),roles=pr.rollen||[];
+  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
+  h+='<div class="sec" style="margin-top:14px"><h3>Drehtage</h3>'+((pr.tage||[]).filter(function(t){return t.von}).length?'<div class="days">'+(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('')+'</div><p class="cl" style="margin:6px 0 0">'+days.length+' Drehtag'+(days.length===1?'':'e')+' insgesamt</p>':'<span class="cl">Noch keine Drehtage eingetragen</span>')+'</div>';
+  if(pr.regieName||pr.regieMail||pr.regieTel||pr.ort)h+='<div class="sec"><h3>Regie und Ort</h3>'+(pr.regieName?'<div class="cm">'+esc(pr.regieName)+'</div>':'')+copyRow(pr.regieMail)+copyRow(pr.regieTel)+(pr.ort?'<div class="cl">Drehort: '+esc(pr.ort)+'</div>':'')+(pr.oeffentlich?'<div class="cl">Für Bewerber sichtbar</div>':'')+'</div>';
+  h+='<div class="sec"><h3>Anforderungen</h3>'+(roles.length?'<div class="rolegrid">'+roles.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div>'+(r.beschr?'<div class="cl">'+esc(r.beschr)+'</div>':'')+'</div>'}).join('')+'</div>':'<span class="cl">Keine Rollen angelegt, es werden alle Profile nach Verfügbarkeit gezeigt.</span>')+'</div>';
+  if(pr.notiz)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(pr.notiz)+'</div></div>';
+  h+='</div>';
+  var rs=roles.length?roles:[{id:'_',name:'',anzahl:null}];
+  if(state.roleSel&&!roles.some(function(r){return r.id===state.roleSel}))state.roleSel='';
+  if(roles.length>1){
+    h+='<div class="chips" style="margin-top:14px" role="group" aria-label="Rolle wählen"><button type="button" class="chip'+(state.roleSel?'':' on')+'" data-act="prole" data-r="" aria-pressed="'+(!state.roleSel)+'">Alle Rollen</button>'+roles.map(function(r){return '<button type="button" class="chip'+(state.roleSel===r.id?' on':'')+'" data-act="prole" data-r="'+esc(r.id)+'" aria-pressed="'+(state.roleSel===r.id)+'">'+esc(r.name||'Rolle')+'</button>'}).join('')+'</div>';
+  }
+  var evalRoles=state.roleSel?rs.filter(function(r){return r.id===state.roleSel}):rs;
+  var sel=pr.auswahl||{};watchDec(pr);
+  var groups={full:[],part:[],none:[],open:[]};
+  state.people.forEach(function(p){
+    var mr=evalRoles.filter(function(r){return roleMatch(p,r)});
+    if(!mr.length)return;
+    var a=days.length?availFor(p,days):null,g;
+    if(!a)g='full';else if(!a.inw)g='open';else if(a.free===a.inw)g='full';else if(a.free>0)g='part';else g='none';
+    groups[g].push({p:p,a:a,mr:mr});
+  });
+  var byName=function(x,y){return String(x.p.nachname||'').localeCompare(String(y.p.nachname||''),'de')||String(x.p.vorname||'').localeCompare(String(y.p.vorname||''),'de')};
+  Object.keys(groups).forEach(function(k){groups[k].sort(function(x,y){return (y.a&&x.a?y.a.free-x.a.free:0)||byName(x,y)})});
+  var selIds=Object.keys(sel).filter(function(id){return findP(id)}),nOpen=selIds.filter(function(id){return sel[id].st==='auswahl'}).length;
+  if(selIds.length){
+    h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Trage unter „Bearbeiten“ die Kunden-ID ein, um die Auswahl zu senden.</span>')+'</div><div class="grid">'+selIds.map(function(id){
+      var p=findP(id),st=effSt(pr,id);
+      return '<div class="mwrap">'+cardHTML(p,statTag(st)+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':''))+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
+    }).join('')+'</div>';
+  }
+  var titles={full:days.length?'Verfügbar und passend':'Passend',part:'Teilweise verfügbar',open:'Verfügbarkeit noch nicht eintragbar',none:'Passend, aber an den Drehtagen nicht verfügbar'};
+  var order=['full','part','open','none'],any=false;
+  order.forEach(function(k){
+    var arr=groups[k];if(!arr.length)return;any=true;
+    h+='<h2 class="mh">'+titles[k]+' <small>'+arr.length+(k==='open'?' · Drehtage liegen außerhalb des Kalenders':'')+'</small></h2><div class="grid">'+arr.map(function(m){
+      var sc='';
+      if(m.a){
+        if(k==='full')sc='<span class="score">alle '+m.a.inw+' Tage frei'+(m.a.out?' (+'+m.a.out+' später)':'')+'</span>';
+        else if(k==='part')sc='<span class="score part">'+m.a.free+' von '+m.a.inw+' Tagen frei</span>';
+        else if(k==='none')sc='<span class="score no">kein Drehtag frei</span>';
+        else sc='<span class="score no">Kalender reicht noch nicht</span>';
+      }
+      if(roles.length&&!state.roleSel)sc+='<span class="cl">'+esc(m.mr.map(function(r){return r.name||'Rolle'}).join(', '))+'</span>';
+      return '<div class="mwrap">'+cardHTML(m.p,sc||' ')+'<button type="button" class="btn small" data-act="merk" data-id="'+esc(m.p.id)+'">'+(sel[m.p.id]?'In Auswahl ✓':'Zur Auswahl')+'</button></div>';
+    }).join('')+'</div>';
+  });
+  if(!any)h+='<div class="empty" style="margin-top:14px"><h3>Niemand passt</h3><p>Kein Profil erfüllt die Anforderungen'+(state.roleSel?' dieser Rolle':'')+'. Lockere ein Kriterium unter „Bearbeiten“.</p></div>';
+  host.innerHTML=h;
+}
+function projToDraft(pr){
+  var d={id:pr?pr.id:'',name:pr?pr.name||'':'',produktion:pr?pr.produktion||'':'',notiz:pr?pr.notiz||'':'',regieName:pr?pr.regieName||'':(role==='kunde'?myName:''),regieMail:pr?pr.regieMail||'':(role==='kunde'?myEmail:''),regieTel:pr?pr.regieTel||'':'',kundeId:pr?pr.kundeId||'':'',ort:pr?pr.ort||'':'',oeffentlich:!!(pr&&pr.oeffentlich),tage:[],rollen:[]};
+  ((pr&&pr.tage)||[]).forEach(function(t){d.tage.push({von:t.von||'',bis:t.bis&&t.bis!==t.von?t.bis:''})});
+  if(!d.tage.length)d.tage.push({von:'',bis:''});
+  ((pr&&pr.rollen)||[]).forEach(function(r){var o={id:r.id};ROLEF.forEach(function(f){var v=r[f.k];o[f.k]=f.t==='list'?(v||[]).join(', '):(v==null?'':String(v))});d.rollen.push(o)});
+  return d;
+}
+function projFormHTML(d){
+  var h='<form id="pform" novalidate><div class="sh"><h2 id="sheetTitle">'+(d.id?'Projekt bearbeiten':'Neues Projekt')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>';
+  h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Projektname</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-prod">Produktion, Kunde</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
+  h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunden-ID <span class="hint">wird bei Kundenprojekten automatisch gesetzt</span></label><input id="p-kid" data-pf="kundeId" value="'+esc(d.kundeId)+'" autocomplete="off"></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' <span class="hint">sehen auch Bewerber</span>':'')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
+  h+='<fieldset><legend>Drehtage</legend>'+d.tage.map(function(t,i){return '<div class="drow"><div class="fld"><label for="pt-v'+i+'">Von</label><input type="date" id="pt-v'+i+'" data-pt="'+i+'" data-k="von" value="'+esc(t.von)+'"></div><div class="fld"><label for="pt-b'+i+'">Bis <span class="hint">leer = ein Tag</span></label><input type="date" id="pt-b'+i+'" data-pt="'+i+'" data-k="bis" value="'+esc(t.bis)+'"></div><button type="button" class="btn small" data-act="ptdel" data-i="'+i+'" aria-label="Zeitraum entfernen">Entfernen</button></div>'}).join('')+'<button type="button" class="btn small" data-act="ptadd">Weiterer Zeitraum</button></fieldset>';
+  h+='<fieldset><legend>Rollen und Anforderungen</legend><p class="cl" style="margin:0 0 10px">Leere Felder bedeuten: egal. Beim Alter wird das Spielalter geprüft.</p>'+d.rollen.map(function(r,i){
+    return '<div class="edrow"><div class="cols wide">'+ROLEF.map(function(f){
+      var id='pr'+i+f.k,v=r[f.k]||'';
+      if(f.t==='sel'){var o=f.o.slice();if(v&&o.indexOf(v)<0)o.push(v);return '<div class="fld"><label for="'+id+'">'+f.l+'</label><select id="'+id+'" data-pr="'+i+'" data-k="'+f.k+'"><option value="">egal</option>'+o.map(function(x){return '<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div>'}
+      return '<div class="fld"><label for="'+id+'">'+f.l+'</label><input id="'+id+'" data-pr="'+i+'" data-k="'+f.k+'" value="'+esc(v)+'" autocomplete="off"'+(f.t==='num'?' inputmode="numeric"':'')+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'></div>';
+    }).join('')+'</div><button type="button" class="btn small danger" data-act="prdel" data-i="'+i+'">Rolle entfernen</button></div>';
+  }).join('')+'<button type="button" class="btn small" data-act="pradd">Rolle hinzufügen</button></fieldset>';
+  h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="psave">Speichern</button><button type="button" class="btn" data-act="close">Abbrechen</button></div></form>';
+  return h;
+}
+function openProjForm(pr){
+  state.pdraft=projToDraft(pr);
+  openSheet(projFormHTML(state.pdraft));
+}
+function rerenderProjForm(focusId){
+  var sc=$('#sheet').scrollTop;
+  $('#sheet').innerHTML=projFormHTML(state.pdraft);
+  $('#sheet').scrollTop=sc;
+  if(focusId){var e=$('#'+focusId);if(e)e.focus()}
+}
+async function saveProj(){
+  var d=state.pdraft,err=$('#ferr'),btn=$('#psave');
+  if(!d.name.trim()){err.textContent='Gib dem Projekt einen Namen.';$('#p-name').focus();return}
+  var tage=[];
+  d.tage.forEach(function(t){if(!t.von)return;var a=t.von,b=t.bis||t.von;if(b<a){var x=a;a=b;b=x}tage.push(b===a?{von:a}:{von:a,bis:b})});
+  tage.sort(function(a,b){return a.von<b.von?-1:1});
+  var rollen=d.rollen.map(function(r,i){
+    var o={id:r.id||('r'+Date.now().toString(36)+i)};
+    ROLEF.forEach(function(f){
+      var v=String(r[f.k]||'').trim();if(!v)return;
+      if(f.t==='num'){var n=num(v);if(n!=null)o[f.k]=n}
+      else if(f.t==='list'){var a=v.split(',').map(function(s){return s.trim()}).filter(Boolean);if(a.length)o[f.k]=a}
+      else o[f.k]=v;
+    });
+    return o;
+  }).filter(function(o){return Object.keys(o).length>1});
+  err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
+  try{
+    var old=d.id?curProj():null;
+    var ref=d.id?db.doc('projekte/'+d.id):db.collection('projekte').doc();
+    var rec={name:d.name.trim(),tage:tage,rollen:rollen,createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
+    if(d.produktion.trim())rec.produktion=d.produktion.trim();
+    if(d.notiz.trim())rec.notiz=d.notiz.trim();
+    if(d.regieName.trim())rec.regieName=d.regieName.trim();
+    if(d.regieMail.trim())rec.regieMail=d.regieMail.trim();
+    if(d.regieTel.trim())rec.regieTel=d.regieTel.trim();
+    if(d.kundeId.trim())rec.kundeId=d.kundeId.trim();
+    if(d.ort.trim())rec.ort=d.ort.trim();
+    if(d.oeffentlich)rec.oeffentlich=true;
+    if(old&&old.auswahl)rec.auswahl=old.auswahl;
+    if(role==='kunde'){rec.ersteller=uid;rec.kundeId=uid;rec.erstellerName=myName||myEmail;delete rec.oeffentlich;if(old&&old.oeffentlich)rec.oeffentlich=true}
+    else if(old&&old.ersteller){rec.ersteller=old.ersteller;if(old.erstellerName)rec.erstellerName=old.erstellerName}
+    await ref.set(rec);
+    if(isAdmin)syncAusschreibung(ref.id,rec);
+    state.pid=ref.id;state.roleSel='';
+    toast('Projekt gespeichert');
+    closeSheet();
+    state.projects=state.projects.filter(function(x){return x.id!==ref.id}).concat([Object.assign({id:ref.id},rec)]);
+    if(state.view==='proj')renderProj();else if(state.view==='kunde')renderKunde();
+  }catch(e){
+    btn.disabled=false;btn.textContent='Speichern';
+    err.textContent='Speichern hat nicht geklappt. Versuche es noch einmal.';
+  }
+}
+/* ---------- Auswahl, Kunden, Anfragen ---------- */
+var STAT={auswahl:['in Auswahl','part'],gesendet:['beim Kunden','part'],bestaetigt:['vom Kunden bestätigt',''],abgelehnt:['vom Kunden abgelehnt','no'],gebucht:['gebucht','']};
+function effSt(pr,pid){
+  var e=(pr.auswahl||{})[pid];if(!e)return null;
+  if(e.st==='gebucht')return 'gebucht';
+  var d=state.decAll[pr.id+'_'+pid];
+  if(e.st==='gesendet'&&d&&(d.status==='bestaetigt'||d.status==='abgelehnt'))return d.status;
+  return e.st;
+}
+function statTag(st){var x=STAT[st]||['',''];return '<span class="score '+x[1]+'">'+x[0]+'</span>'}
+function watchDec(pr){
+  var key=pr&&pr.kundeId?pr.kundeId:'';
+  if(state.decKey===key)return;
+  if(state.decUnsub){try{state.decUnsub()}catch(e){}state.decUnsub=null}
+  state.decKey=key;state.decAll={};
+  if(!key||!db)return;
+  try{
+    state.decUnsub=db.collection('kunden/'+key+'/auswahl').onSnapshot(function(snap){
+      var m={};snap.docs.forEach(function(d){m[d.id]=d.data()||{}});
+      state.decAll=m;
+      if(state.view==='proj'&&$('#scrim').hidden)renderProj();
+    },function(){});
+  }catch(e){}
+}
+async function saveSel(pr,map){
+  pr.auswahl=map;renderProj();
+  try{await db.doc('projekte/'+pr.id).update({auswahl:map,updatedAt:Date.now()})}catch(e){toast('Speichern hat nicht geklappt.')}
+}
+function selRole(){
+  var pr=curProj();if(!pr||!state.roleSel)return '';
+  var r=(pr.rollen||[]).filter(function(x){return x.id===state.roleSel})[0];return r?(r.name||''):'';
+}
+function addSel(pid){
+  var pr=curProj();if(!pr)return;
+  var m=Object.assign({},pr.auswahl||{});
+  if(m[pid]){
+    if(m[pid].st!=='auswahl'){toast('Schon gesendet oder gebucht. Entfernen geht in der Auswahl.');return}
+    delete m[pid];
+  }else m[pid]={st:'auswahl',rolle:selRole(),at:Date.now()};
+  saveSel(pr,m);
+}
+async function removeSel(pid){
+  var pr=curProj();if(!pr)return;
+  var m=Object.assign({},pr.auswahl||{});delete m[pid];
+  if(pr.kundeId){try{await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+pid).delete()}catch(e){}}
+  saveSel(pr,m);
+}
+function bookSel(pid){
+  var pr=curProj();if(!pr)return;
+  var m=Object.assign({},pr.auswahl||{});
+  m[pid]=Object.assign({},m[pid]||{},{st:'gebucht',at:Date.now()});
+  saveSel(pr,m);toast('Als gebucht eingetragen');
+}
+async function sendSel(){
+  var pr=curProj();if(!pr||!pr.kundeId||state.sending)return;
+  var m=Object.assign({},pr.auswahl||{}),ids=Object.keys(m).filter(function(id){return m[id].st==='auswahl'&&findP(id)});
+  if(!ids.length)return;
+  state.sending=true;var b=$('[data-act="send"]');if(b){b.disabled=true;b.textContent='Sendet …'}
+  try{
+    for(var i=0;i<ids.length;i++){
+      var p=findP(ids[i]),ph={};
+      try{ph=await loadPhotos(p)}catch(e){}
+      var fotos=[];
+      ['portrait','ganzkoerper','profil'].forEach(function(k){if(ph[k]){fotos.push({l:(ALLSLOTS.filter(function(s){return s.k===k})[0]||{}).l||k,src:ph[k].data||ph[k].thumb})}});
+      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:p.typ||[],geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',fotos:fotos};
+      while(JSON.stringify(snap).length>220000&&snap.fotos.length)snap.fotos.pop();
+      await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',snap:snap,sentAt:Date.now()});
+      m[p.id]=Object.assign({},m[p.id],{st:'gesendet',sentAt:Date.now()});
+    }
+    pr.auswahl=m;
+    await db.doc('projekte/'+pr.id).update({auswahl:m,updatedAt:Date.now()});
+    toast(ids.length+' Profil'+(ids.length===1?'':'e')+' an den Kunden gesendet');
+  }catch(e){toast('Senden hat nicht geklappt. Versuche es noch einmal.')}
+  state.sending=false;renderProj();
+}
+async function syncAusschreibung(id,rec){
+  try{
+    if(rec&&rec.oeffentlich){
+      await db.doc('ausschreibung/'+id).set({ort:rec.ort||'',tage:rec.tage||[],rollen:(rec.rollen||[]).map(function(r){return {name:r.name||'',anzahl:r.anzahl||null,typ:r.typ||'',beschr:r.beschr||'',krit:roleCrit(r)}}),updatedAt:Date.now()});
+    }else await db.doc('ausschreibung/'+id).delete();
+  }catch(e){}
+}
+
+/* Kundenbereich */
+async function renderKunde(){
+  var host=$('#v-kunde');
+  $('#count').textContent='Deine Projekte und Auswahlen';
+  if(!db||state.nodb){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2></div>';return}
+  var docs=[];
+  try{var qs=await db.collection('kunden/'+uid+'/auswahl').get();docs=qs.docs.map(function(d){return Object.assign({},d.data()||{},{key:d.id})})}catch(e){}
+  if(state.view!=='kunde')return;
+  state.kdocs={};docs.forEach(function(d){state.kdocs[d.key]=d});
+  var h='<div class="selfwrap"><h2 style="font-size:30px">Deine Projekte</h2><p class="intro" style="margin-top:6px">Lege ein Projekt mit Drehtagen und gesuchten Rollen an. Die Agentur schlägt dir passende, verfügbare Darsteller vor. Du bestätigst oder lehnst jedes Profil ab. Kontaktdaten der Personen bekommst du nicht.</p><div class="acts" style="border:0;padding:0;margin-top:12px"><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div></div>';
+  var list=state.projects.slice().sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
+  if(!list.length)h+='<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Tippe auf „Neues Projekt“, um zu beginnen.</p></div>';
+  list.forEach(function(pr){
+    var tg=(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('');
+    h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.kDelId===pr.id?'<button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Endgültig löschen</button><button type="button" class="btn" data-act="kpno">Abbrechen</button>':'<button type="button" class="btn" data-act="kpedit" data-id="'+esc(pr.id)+'">Bearbeiten</button><button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Löschen</button>')+'</div></div>'+
+      (tg?'<div class="sec" style="margin-top:12px"><h3>Drehtage</h3><div class="days">'+tg+'</div></div>':'')+
+      ((pr.rollen||[]).length?'<div class="sec"><h3>Gesucht</h3><div class="rolegrid">'+pr.rollen.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div></div>'}).join('')+'</div></div>':'')+'</div>';
+    var arr=docs.filter(function(d){return d.projId===pr.id});
+    if(!arr.length){h+='<p class="cl" style="margin:8px 4px 0">Die Agentur hat noch keine Profile vorgeschlagen.</p>';return}
+    h+='<h2 class="mh">Vorschläge der Agentur <small>'+arr.length+'</small></h2><div class="grid">';
+    arr.sort(function(a,b){return String((a.snap||{}).nachname||'').localeCompare(String((b.snap||{}).nachname||''),'de')}).forEach(function(d){
+      var s=d.snap||{},st=d.status||'offen';
+      var meta=[s.alter!=null?s.alter+' J':null,s.groesse?s.groesse+' cm':null,s.konfektion?'Gr. '+s.konfektion:null].filter(Boolean).join(' · ');
+      var look=[s.haarfarbe,s.haarlaenge?'Haar '+s.haarlaenge:null,s.augenfarbe?'Augen '+s.augenfarbe:null,s.bart].filter(Boolean).join(' · ');
+      var fo=(s.fotos&&s.fotos.length)?s.fotos[0].src:s.thumb;
+      h+='<div class="mwrap"><div class="card kc"><button type="button" class="ph zoomable" data-act="kzoom" data-key="'+esc(d.key)+'" aria-label="Fotos ansehen">'+(fo?'<img alt="" src="'+esc(s.thumb||fo)+'">':esc(((s.vorname||'').charAt(0)+(s.nachname||'').charAt(0)).toUpperCase()||'?'))+'</button><div class="ci"><div class="cn">'+esc((s.vorname||'')+' '+(s.nachname||''))+'</div>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+(look?'<div class="cl">'+esc(look)+'</div>':'')+'<div class="tags">'+(s.typ||[]).map(function(t){return '<span class="pill">'+esc(t)+'</span>'}).join('')+(s.ort?'<span class="cl">'+esc(s.ort)+'</span>':'')+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'')+'</div>'+((s.sprachen||[]).length||(s.fertigkeiten||[]).length?'<div class="cl">'+esc((s.sprachen||[]).concat(s.fertigkeiten||[]).join(', '))+'</div>':'')+'</div></div>'+
+        '<div class="pbar" style="margin:0"><button type="button" class="btn small'+(st==='bestaetigt'?' primary':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="bestaetigt">'+(st==='bestaetigt'?'Bestätigt ✓':'Bestätigen')+'</button><button type="button" class="btn small'+(st==='abgelehnt'?' danger':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="abgelehnt">'+(st==='abgelehnt'?'Abgelehnt ✓':'Ablehnen')+'</button></div></div>';
+    });
+    h+='</div>';
+  });
+  host.innerHTML=h;
+}
+async function kDecide(key,s){
+  var d=state.kdocs&&state.kdocs[key];if(!d)return;
+  var ns=d.status===s?'offen':s;
+  d.status=ns;
+  try{await db.doc('kunden/'+uid+'/auswahl/'+key).update({status:ns,decidedAt:Date.now()});toast(ns==='bestaetigt'?'Bestätigt':ns==='abgelehnt'?'Abgelehnt':'Entscheidung zurückgenommen')}
+  catch(e){toast('Speichern hat nicht geklappt.')}
+  renderKunde();
+}
+function kZoom(key){
+  var d=state.kdocs&&state.kdocs[key];if(!d)return;
+  var s=d.snap||{},items=(s.fotos||[]).map(function(f){return {label:f.l,src:f.src,thumb:f.src}});
+  if(!items.length&&s.thumb)items=[{label:'Foto',src:s.thumb,thumb:s.thumb}];
+  if(!items.length)return;
+  state.gallery=items;state.detailLoad=null;$('#lb').hidden=false;showGal(0);
+}
+async function loadAnfragen(){
+  var out='';
+  try{
+    var qs=await db.collection('ausschreibung').get();
+    var arr=qs.docs.map(function(d){return d.data()||{}}).filter(function(a){return (a.rollen||[]).length||(a.tage||[]).length});
+    arr.sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
+    if(arr.length){
+      out='<div class="selfwrap"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 12px">Dafür sucht die Agentur gerade Leute. Trage unten im Kalender ein, wann du Zeit hast.</p><div class="rolegrid">'+arr.map(function(a){
+        var tg=(a.tage||[]).filter(function(t){return t.von}).map(function(t){return t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von)}).join(', ');
+        return '<div class="role"><b>'+esc(tg||'Termin offen')+'</b>'+(a.ort?'<div class="cl">'+esc(a.ort)+'</div>':'')+(a.rollen||[]).map(function(r){return '<div style="margin-top:6px"><span class="pill">'+esc(r.typ||'Rolle')+'</span> '+(r.anzahl?'<span class="cm">× '+r.anzahl+'</span> ':'')+esc(r.name||'')+'<div class="cl">'+esc((r.krit||[]).filter(function(x){return x!==r.typ}).join(' · '))+(r.beschr?(r.krit&&r.krit.length?' · ':'')+esc(r.beschr):'')+'</div></div>'}).join('')+'</div>';
+      }).join('')+'</div></div>';
+    }
+  }catch(e){}
+  return out;
+}
+
+async function removeProj(){
+  var pr=curProj();if(!pr)return;
+  try{
+    await db.doc('projekte/'+pr.id).delete();
+    if(isAdmin)syncAusschreibung(pr.id,null);
+    if(role==='kunde'){try{var kq=await db.collection('kunden/'+uid+'/auswahl').get();for(var qi=0;qi<kq.docs.length;qi++){if((kq.docs[qi].data()||{}).projId===pr.id)await db.doc('kunden/'+uid+'/auswahl/'+kq.docs[qi].id).delete()}}catch(e){}}
+    state.projects=state.projects.filter(function(x){return x.id!==pr.id});
+    state.confirmDelP=false;state.kDelId='';state.pid='';toast('Projekt gelöscht');if(state.view==='kunde')renderKunde();else renderProj();
+  }catch(e){toast('Löschen hat nicht geklappt.')}
+}
+
+/* ---------- Start ---------- */
+async function start(){
+  var who=$('#whoami');if(who)who.textContent=(myName||myEmail)+(ctx.mode==='local'?' · Testmodus':'');
+  if(role==='admin'){
+    renderList();refreshPanel(true);
+    setView('kartei');
+    db.collection('people').onSnapshot(function(snap){
+      state.people=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
+      state.loaded=true;
+      if(state.view==='kartei'){renderList();refreshPanel(false)}
+      else if(state.view==='proj'&&$('#scrim').hidden)renderProj();
+    },function(){state.nodb=true;renderList()});
+    db.collection('projekte').onSnapshot(function(snap){
+      state.projects=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
+      if(state.view==='proj'&&$('#scrim').hidden)renderProj();
+    },function(){});
+  }else if(role==='kunde'){
+    state.loaded=true;
+    setView('kunde');
+    db.collection('projekte').where('ersteller','==',uid).onSnapshot(function(snap){
+      state.projects=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
+      if(state.view==='kunde'&&$('#scrim').hidden)renderKunde();
+    },function(){state.nodb=true;renderKunde()});
+  }else{
+    state.loaded=true;
+    setView('self');
+  }
+}
+start();
+}
+
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (s) => s.slice(8, 10) + '.' + s.slice(5, 7) + '.' + s.slice(0, 4);
+const ERR = {
+  'auth/invalid-credential': 'E-Mail oder Passwort stimmt nicht.',
+  'auth/wrong-password': 'E-Mail oder Passwort stimmt nicht.',
+  'auth/user-not-found': 'E-Mail oder Passwort stimmt nicht.',
+  'auth/invalid-email': 'Die E-Mail-Adresse ist ungültig.',
+  'auth/email-already-in-use': 'Zu dieser E-Mail gibt es schon ein Konto. Melde dich an.',
+  'auth/weak-password': 'Das Passwort ist zu kurz. Nimm mindestens 6 Zeichen.',
+  'auth/too-many-requests': 'Zu viele Versuche. Warte kurz und versuche es später noch einmal.',
+  'auth/network-request-failed': 'Keine Verbindung. Prüfe dein Internet.',
+  'permission-denied': 'Dafür fehlt die Berechtigung.'
+};
+const errText = (e) => ERR[e && e.code] || 'Das hat nicht geklappt. Versuche es noch einmal.';
+
+let be = null, started = false, mode = 'login';
+
+async function anfragenHTML() {
+  try {
+    const qs = await be.db.collection('ausschreibung').get();
+    const arr = qs.docs.map((d) => d.data() || {}).filter((a) => (a.rollen || []).length || (a.tage || []).length);
+    arr.sort((a, b) => String(((a.tage || [])[0] || {}).von || '9').localeCompare(String(((b.tage || [])[0] || {}).von || '9')));
+    if (!arr.length) return '';
+    return '<div class="card2"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 12px">Dafür sucht die Agentur gerade Leute. Registriere dich, um mitzumachen.</p><div class="rolegrid">' + arr.map((a) => {
+      const tg = (a.tage || []).filter((t) => t.von).map((t) => t.bis && t.bis !== t.von ? fmt(t.von) + ' – ' + fmt(t.bis) : fmt(t.von)).join(', ');
+      return '<div class="role"><b>' + esc(tg || 'Termin offen') + '</b>' + (a.ort ? '<div class="cl">' + esc(a.ort) + '</div>' : '') + (a.rollen || []).map((r) => '<div style="margin-top:6px"><span class="pill">' + esc(r.typ || 'Rolle') + '</span> ' + (r.anzahl ? '<span class="cm">× ' + r.anzahl + '</span> ' : '') + esc(r.name || '') + '<div class="cl">' + esc((r.krit || []).filter((x) => x !== r.typ).join(' · ')) + (r.beschr ? ((r.krit || []).length ? ' · ' : '') + esc(r.beschr) : '') + '</div></div>').join('') + '</div>';
+    }).join('') + '</div></div>';
+  } catch (e) { return ''; }
+}
+
+async function renderAuth(msg, ok) {
+  const host = $('#auth');
+  const reg = mode === 'register';
+  let h = '<div class="auth"><h1>Casting-Kartei</h1><p class="sub" style="margin-top:8px">Komparsen, Kleindarsteller und Schauspieler</p>';
+  h += '<div class="card2"><div class="tabs" style="margin-bottom:14px;width:fit-content"><button type="button" class="tab" data-m="login" aria-pressed="' + (!reg) + '">Anmelden</button><button type="button" class="tab" data-m="register" aria-pressed="' + reg + '">Registrieren</button></div>';
+  h += '<form id="aform" novalidate>';
+  if (reg) {
+    h += '<div class="rolepick" role="radiogroup" aria-label="Ich bin"><label><input type="radio" name="rolle" value="bewerber" checked><span><b>Komparse, Kleindarsteller oder Schauspieler</b><span class="cl">Ich möchte mit meinem Profil vermittelt werden.</span></span></label><label><input type="radio" name="rolle" value="kunde"><span><b>Produktion oder Regie</b><span class="cl">Ich suche Darsteller für ein Projekt.</span></span></label></div>';
+    h += '<div class="fld"><label for="a-name">Name</label><input id="a-name" autocomplete="name"></div>';
+  }
+  h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></div>';
+  h += '<div class="ferr" id="aerr" role="alert">' + (ok ? '' : esc(msg || '')) + '</div>' + (ok ? '<div class="okmsg" role="status">' + esc(msg) + '</div>' : '');
+  h += '<div class="acts" style="margin-top:6px;border:0;padding:0"><button type="submit" class="btn primary" id="abtn">' + (reg ? 'Konto anlegen' : 'Anmelden') + '</button>' + (reg ? '' : '<button type="button" class="btn" id="areset">Passwort vergessen</button>') + '</div></form>';
+  if (be.mode === 'local') {
+    h += '<div class="cl" style="margin-top:14px">Testmodus ohne Server. Schnell ausprobieren:</div><div class="demo"><button type="button" class="btn small" data-demo="u_admin">Als Agentur</button><button type="button" class="btn small" data-demo="u_bew">Als Bewerber</button><button type="button" class="btn small" data-demo="u_kunde">Als Kunde</button></div>';
+  }
+  h += '</div><div id="anfr"></div><div class="foot"><a href="datenschutz.html">Datenschutz</a><a href="impressum.html">Impressum</a></div></div>';
+  host.innerHTML = h; host.hidden = false; $('#app').hidden = true;
+  anfragenHTML().then((x) => { const e = $('#anfr'); if (e) e.innerHTML = x; });
+}
+
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  if (t.dataset && t.dataset.m) { mode = t.dataset.m; renderAuth(); return; }
+  if (t.dataset && t.dataset.demo) { await be.signIn('', '', t.dataset.demo); location.reload(); return; }
+  if (t.id === 'areset') {
+    const m = $('#a-mail').value.trim();
+    if (!m) { $('#aerr').textContent = 'Trage zuerst deine E-Mail ein.'; return; }
+    try { await be.reset(m); renderAuth('Wir haben dir eine E-Mail zum Zurücksetzen geschickt, falls es das Konto gibt.', true); } catch (x) { $('#aerr').textContent = errText(x); }
+  }
+  if (t.dataset && t.dataset.act === 'logout') { try { await be.signOut(); } catch (x) {} location.reload(); }
+});
+document.addEventListener('submit', async (e) => {
+  if (e.target.id !== 'aform') return;
+  e.preventDefault();
+  const mail = $('#a-mail').value.trim(), pw = $('#a-pw').value, err = $('#aerr'), btn = $('#abtn');
+  if (!mail || !pw) { err.textContent = 'Trage E-Mail und Passwort ein.'; return; }
+  btn.disabled = true;
+  try {
+    if (mode === 'register') {
+      const name = $('#a-name').value.trim();
+      if (!name) { err.textContent = 'Trage deinen Namen ein.'; btn.disabled = false; return; }
+      const role = (document.querySelector('input[name=rolle]:checked') || {}).value || 'bewerber';
+      await be.register(mail, pw, name, role);
+      if (be.mode === 'local') location.reload();
+    } else {
+      await be.signIn(mail, pw);
+      if (be.mode === 'local') location.reload();
+    }
+  } catch (x) { err.textContent = errText(x); btn.disabled = false; }
+});
+
+async function boot() {
+  try { be = await createBackend(); } catch (e) {
+    $('#auth').innerHTML = '<div class="auth"><h1>Casting-Kartei</h1><p class="ferr">Die Verbindung zum Server ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';
+    $('#auth').hidden = false; return;
+  }
+  be.onAuth((info) => {
+    if (!info) { if (started) location.reload(); else renderAuth(); return; }
+    if (!info.role) { renderAuth('Zu diesem Konto fehlt die Rolle. Bitte melde dich ab und registriere dich neu.'); be.signOut(); return; }
+    if (started) return;
+    started = true;
+    $('#auth').hidden = true; $('#app').hidden = false;
+    runApp({ db: be.db, role: info.role, uid: info.uid, name: info.name, email: info.email, deleteAccount: be.deleteAccount, mode: be.mode });
+  });
+}
+boot();
+
+
+</script>
+</body>
+</html>
