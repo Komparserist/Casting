@@ -228,6 +228,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
     <button type="button" class="tab" data-act="view" data-v="kartei" aria-pressed="true">Kartei</button>
     <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte</button>
     <button type="button" class="tab" data-act="view" data-v="self" aria-pressed="false">Mein Profil</button>
+    <button type="button" class="tab" data-act="view" data-v="buch" aria-pressed="false">Anfragen und Buchungen</button>
     <button type="button" class="tab" data-act="view" data-v="kunde" aria-pressed="false">Für Produktionen</button>
   </nav>
 
@@ -258,6 +259,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
   <div id="v-proj" hidden></div>
   <div id="v-self" hidden></div>
   <div id="v-kunde" hidden></div>
+  <div id="v-buch" hidden></div>
 </div>
 
 <div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
@@ -502,6 +504,28 @@ function $(s,r){return (r||document).querySelector(s)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function num(v){if(v===''||v==null)return null;var n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null}
 function ageOf(p){return p.geburtsjahr?YEAR-p.geburtsjahr:null}
+var AGENTUR_MAIL='';
+function hasSch(p){return (p.typ||[]).indexOf('Schauspieler')>=0}
+function schOK(p){return !!p&&(p.schauspielerStatus==='geprueft'||!p.selbst)}
+function effTyp(p){return (p.typ||[]).filter(function(t){return t!=='Schauspieler'||schOK(p)})}
+function typLabel(p,t){return t==='Schauspieler'&&!schOK(p)?'Schauspieler (Nachweis offen)':t}
+function tageStr(tage){return (tage||[]).filter(function(t){return t.von}).map(function(t){return t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von)}).join(', ')}
+function schNotice(){
+  return '<p class="warn" style="margin:8px 0 0;font-weight:500">Hinweis zu Schauspieler: Schicke deinen Ausbildungsnachweis per E-Mail an die Agentur'+(AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'')+'. Bis sie ihn bestätigt hat, wirst du nur als Komparse vorgeschlagen, wenn du auch Komparse angekreuzt hast, sonst gar nicht. Nach dem Speichern kannst du die Kategorie nicht mehr selbst ändern, ein Wechsel geht nur auf Anfrage per E-Mail. Die Gage wird mit jedem Projekt neu verhandelt.</p>';
+}
+function typBlock(p,self){
+  var h='<div class="fld" style="margin-top:12px"><div class="fl">Kategorie</div>';
+  if(self&&p.id&&(p.typ||[]).length){
+    h+='<div class="tags">'+p.typ.map(function(t){return '<span class="pill">'+esc(t==='Schauspieler'?(schOK(p)?'Schauspieler (bestätigt)':'Schauspieler (Nachweis offen)'):t)+'</span>'}).join('')+'</div>'+
+      '<p class="cl" style="margin:6px 0 0">Die Kategorie kannst du nicht selbst ändern. Schreibe dafür eine E-Mail an die Agentur'+(AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'')+'.</p>'+
+      (hasSch(p)&&!schOK(p)?schNotice():'');
+  }else{
+    h+=checks('typ',TYPEN,p.typ||[]);
+    if(self)h+='<div id="schnote"'+(hasSch(p)?'':' hidden')+'>'+schNotice()+'</div>';
+    else if(p.selbst)h+='<label class="consent" id="gepwrap" style="margin-top:10px"'+(hasSch(p)?'':' hidden')+'><input type="checkbox" id="f-geprueft"'+(p.schauspielerStatus==='geprueft'?' checked':'')+'><span>Ausbildungsnachweis liegt vor, als Schauspieler bestätigt</span></label>';
+  }
+  return h+'</div>';
+}
 function newFilters(){
   var f={sets:{},r:{},t:{},spiel:'',plz:'',dFrom:'',dTo:''};
   GROUPS.forEach(function(g){f.sets[g.k]=new Set()});
@@ -586,7 +610,7 @@ function cardHTML(p,extra){
   var meta=[age!=null?age+' J':null,p.groesse?p.groesse+' cm':null,p.konfektion?'Gr. '+p.konfektion:null,p.schuh?'Schuh '+p.schuh:null].filter(Boolean).join(' · ');
   var look=[p.haarfarbe,p.haarlaenge?'Haar '+p.haarlaenge:null,p.augenfarbe?'Augen '+p.augenfarbe:null].filter(Boolean).join(' · ');
   var tags='';
-  (p.typ||[]).forEach(function(t){tags+='<span class="pill">'+esc(t)+'</span>'});
+  (p.typ||[]).forEach(function(t){tags+='<span class="pill">'+esc(typLabel(p,t))+'</span>'});
   if(p.selbst)tags+='<span class="cl">selbst eingetragen</span>';
   if(p.ort||p.plz)tags+='<span class="cl">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</span>';
   var nf=nextFree(p);if(nf&&!extra)tags+='<span class="cl">frei ab '+fmtDM(nf)+'</span>';
@@ -688,9 +712,10 @@ function detailHTML(p,confirmDel,ro){
   var age=ageOf(p);
   var h='<div class="sh"><h2 id="sheetTitle">Profil</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
   h+='<div class="dhead"><'+(p.thumb?'button type="button" class="ph zoomable" data-act="zoom" data-id="'+esc(p.id)+'" aria-label="Foto vergrößern"':'div class="ph"')+' id="dph">'+(p.thumb?'<img alt="Foto von '+esc(fullName(p))+'" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</'+(p.thumb?'button':'div')+'><div class="dn"><h2>'+esc(fullName(p))+'</h2><div class="tags">';
-  (p.typ||[]).forEach(function(t){h+='<span class="pill">'+esc(t)+'</span>'});
+  (p.typ||[]).forEach(function(t){h+='<span class="pill">'+esc(typLabel(p,t))+'</span>'});
   if(p.selbst)h+='<span class="cl">selbst eingetragen</span>';
   h+='</div>';
+  if(hasSch(p)&&!schOK(p))h+='<p class="warn" style="margin:8px 0 0">Schauspieler-Nachweis noch offen. Wird nur als Komparse vorgeschlagen, falls auch Komparse gewählt ist.</p>';
   if(p.ort||p.plz)h+='<p class="cl" style="margin:8px 0 0">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</p>';
   if(p.agentur)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
   h+='</div></div>';
@@ -708,8 +733,8 @@ function detailHTML(p,confirmDel,ro){
   h+='<div class="sec"><h3>Führerschein</h3>'+chipList(p.fuehrerschein)+'</div>';
   if(p.erfahrung)h+='<div class="sec"><h3>Erfahrung</h3><div class="notes">'+esc(p.erfahrung)+'</div></div>';
   h+='<div class="sec"><h3>Kontakt und Konditionen</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
-    (p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl>':'')+
-    (!p.telefon&&!p.email&&!p.instagram&&!p.social&&(p.gage==null||p.gage==='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
+    (hasSch(p)&&p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl><p class="cl" style="margin:4px 0 0">Die Gage kann mit jedem Projekt neu verhandelt werden.</p>':'')+
+    (!p.telefon&&!p.email&&!p.instagram&&!p.social&&!(hasSch(p)&&p.gage!=null&&p.gage!=='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
   if(p.notizen)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(p.notizen)+'</div></div>';
   h+='<div class="sec"><h3>Datenschutz</h3>'+(p.einwilligung?'<span class="cl">Einwilligung zur Speicherung liegt vor'+(p.einwilligungDatum?' (seit '+esc(p.einwilligungDatum)+')':'')+'.</span>':'<span class="warn">Einwilligung zur Speicherung fehlt. Hole sie ein, bevor du das Profil weitergibst.</span>')+'</div>';
   if(ro){
@@ -744,7 +769,7 @@ function formHTML(p,self){
     inp('f-geburtsjahr','Geburtsjahr',p.geburtsjahr,'inputmode="numeric" placeholder="z. B. 1988"')+
     inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+
     inp('f-plz','Postleitzahl',p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort',p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
-    '</div><div class="fld" style="margin-top:12px"><div class="fl">Kategorie</div>'+checks('typ',TYPEN,p.typ||[])+'</div>'+
+    '</div>'+typBlock(p,self)+
     '<div class="fld" style="margin-top:12px"><div class="fl">Fotos <span class="hint">Portrait, Ganzkörper und Profilansicht, dazu bis zu 5 weitere</span></div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
   h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
     inp('f-groesse','Größe (cm)',p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
@@ -763,7 +788,7 @@ function formHTML(p,self){
     '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div></fieldset>';
   h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
     inp('f-telefon','Telefon',p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',p.email,'type="text" inputmode="email" autocomplete="off"')+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
-    (self?'':inp('f-gage','Tagesgage (€)',p.gage,'inputmode="decimal"'))+'</div>'+
+    (self?'':'<div id="gagefld"'+(hasSch(p)?'':' hidden')+'>'+inp('f-gage','Tagesgage (€), nur Schauspieler',p.gage,'inputmode="decimal"')+'<p class="cl" style="margin:4px 0 0">Nur intern. Die Gage kann mit jedem Projekt neu verhandelt werden.</p></div>')+'</div>'+
     (self?'<p class="cl" style="margin:8px 0 0">Deine Kontaktdaten sieht nur die Agentur.</p>':'<div class="fld" style="margin-top:12px"><label for="f-notizen">Notizen</label><textarea id="f-notizen">'+esc(p.notizen)+'</textarea></div>')+'</fieldset>';
   if(self)h+='<fieldset><legend>Wann hast du Zeit?</legend>'+calHTML(p,true)+'</fieldset>';
   h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
@@ -809,7 +834,12 @@ function readForm(self){
     erfahrung:val('f-erfahrung'),telefon:val('f-telefon'),email:val('f-email'),instagram:val('f-instagram'),social:val('f-social'),gage:num(val('f-gage')),
     notizen:val('f-notizen'),einwilligung:$('#f-einw').checked
   };
-  if(self){delete d.agentur;delete d.gage;delete d.notizen}
+  if(self){delete d.agentur;delete d.gage;delete d.notizen;var sp=state.selfP;if(sp&&sp.id&&(sp.typ||[]).length)d.typ=sp.typ.slice()}
+  else{
+    var isS=d.typ.indexOf('Schauspieler')>=0,gp=$('#f-geprueft');
+    if(!isS)d.gage=null;
+    d.schauspielerStatus=isS&&gp?(gp.checked?'geprueft':'offen'):'';
+  }
   return d;
 }
 function baseRec(old,d){
@@ -940,6 +970,11 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   var t=e.target;
+  if(t.name==='typ'&&t.closest&&t.closest('#form')){
+    var sch=!!document.querySelector('#form input[name="typ"][value="Schauspieler"]:checked');
+    ['schnote','gepwrap','gagefld'].forEach(function(i){var el=$('#'+i);if(el)el.hidden=!sch});
+    return;
+  }
   if(t.id==='sort'){state.sort=t.value;renderList()}
   else if(t.id==='psel'){state.pid=t.value;state.roleSel='';state.confirmDelP=false;renderProj()}
   else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
@@ -1130,19 +1165,20 @@ async function removeExamples(){
 
 /* ---------- Masken ---------- */
 function fmtDMY(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)}
-function tabsFor(r){return r==='admin'?['kartei','proj']:r==='kunde'?['kunde']:['self']}
+function tabsFor(r){return r==='admin'?['kartei','proj']:r==='kunde'?['kunde']:['self','buch']}
 function setView(v){
   var tabs=tabsFor(role);
   if(tabs.indexOf(v)<0)v=tabs[0];
   flushCal();
   state.view=v;
-  ['kartei','proj','self','kunde'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
+  ['kartei','proj','self','kunde','buch'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
   Array.prototype.forEach.call(document.querySelectorAll('#nav .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));b.hidden=tabs.indexOf(b.dataset.v)<0});
   $('#nav').hidden=tabs.length<2;
   $('#topact').hidden=!(isAdmin&&v==='kartei');
   if(v==='kartei')renderList();
   else if(v==='proj')renderProj();
   else if(v==='kunde')renderKunde();
+  else if(v==='buch')renderBuch();
   else renderSelf();
 }
 function calEndStr(){var e=weekStart(new Date());e.setDate(e.getDate()+WEEKS*7-1);return ymd(e)}
@@ -1160,9 +1196,7 @@ async function renderSelf(note){
   state.selfP=p;resetPhotoState();
   state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
   var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||{email:myEmail,vorname:(myName||'').split(' ')[0]||'',nachname:(myName||'').split(' ').slice(1).join(' ')},true)+'</div></div>';
-  var anf=await loadAnfragen();
-  if(state.view!=='self')return;
-  host.innerHTML=anf+h;
+  host.innerHTML=h;
   if(p&&p.hasFoto){state.photoLoad=loadPhotos(p).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}
 }
 async function saveSelf(){
@@ -1178,7 +1212,9 @@ async function saveSelf(){
   try{
     var ref=db.doc('people/'+uid),old=null;
     try{var sn=await ref.get();if(sn.exists)old=Object.assign({},sn.data()||{})}catch(e){}
+    if(old&&(old.typ||[]).length)d.typ=old.typ.slice();
     var rec=baseRec(old,d);
+    if(d.typ.indexOf('Schauspieler')>=0)rec.schauspielerStatus=(old&&old.schauspielerStatus)||'offen';else delete rec.schauspielerStatus;
     rec.selbst=true;rec.uid=uid;
     rec.createdAt=old&&old.createdAt?old.createdAt:Date.now();rec.updatedAt=Date.now();
     rec.einwilligungDatum=(old&&old.einwilligungDatum)||new Date().toISOString().slice(0,10);
@@ -1230,7 +1266,7 @@ function roleCrit(r){
   return out;
 }
 function roleMatch(p,r){
-  if(r.typ&&(p.typ||[]).indexOf(r.typ)<0)return false;
+  if(r.typ&&effTyp(p).indexOf(r.typ)<0)return false;
   if(r.geschlecht&&p.geschlecht!==r.geschlecht)return false;
   if(r.alterVon!=null||r.alterBis!=null){
     var lo=r.alterVon!=null?r.alterVon:0,hi=r.alterBis!=null?r.alterBis:200;
@@ -1435,13 +1471,28 @@ async function removeSel(pid){
   var pr=curProj();if(!pr)return;
   var m=Object.assign({},pr.auswahl||{});delete m[pid];
   if(pr.kundeId){try{await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+pid).delete()}catch(e){}}
+  try{await db.doc('buchungen/'+pid+'/e/'+pr.id).delete()}catch(e){}
   saveSel(pr,m);
+}
+function bookMail(p,pr,rolle){
+  var L=[];
+  L.push('Hallo '+(p.vorname||fullName(p))+',','','wir freuen uns, dich buchen zu dürfen.','');
+  if(pr.name)L.push('Projekt: '+pr.name);
+  if(rolle)L.push('Rolle: '+rolle);
+  var tg=tageStr(pr.tage);if(tg)L.push('Drehtage: '+tg);
+  if(pr.ort)L.push('Drehort: '+pr.ort);
+  L.push('','Bitte bestätige uns kurz per Antwort, dass du an den Terminen Zeit hast. Treffpunkt und Ablauf schicken wir dir noch.','','Viele Grüße',myName||'');
+  return 'mailto:'+encodeURIComponent(p.email)+'?subject='+encodeURIComponent('Buchung'+(pr.name?': '+pr.name:''))+'&body='+encodeURIComponent(L.join('\r\n'));
 }
 function bookSel(pid){
   var pr=curProj();if(!pr)return;
-  var m=Object.assign({},pr.auswahl||{});
+  var p=findP(pid),m=Object.assign({},pr.auswahl||{});
   m[pid]=Object.assign({},m[pid]||{},{st:'gebucht',at:Date.now()});
-  saveSel(pr,m);toast('Als gebucht eingetragen');
+  var rolle=m[pid].rolle||selRole();m[pid].rolle=rolle;
+  if(p&&p.email){var a=document.createElement('a');a.href=bookMail(p,pr,rolle);document.body.appendChild(a);a.click();a.remove();toast('Gebucht. Die Mail ist vorbereitet, tippe im Mailprogramm auf Senden.')}
+  else toast('Als gebucht eingetragen. Im Profil steht keine E-Mail, daher keine Mail.');
+  saveSel(pr,m);
+  if(p&&p.selbst){db.doc('buchungen/'+pid+'/e/'+pr.id).set({projId:pr.id,rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:Date.now()}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
 }
 async function sendSel(){
   var pr=curProj();if(!pr||!pr.kundeId||state.sending)return;
@@ -1454,7 +1505,7 @@ async function sendSel(){
       try{ph=await loadPhotos(p)}catch(e){}
       var fotos=[];
       ['portrait','ganzkoerper','profil'].forEach(function(k){if(ph[k]){fotos.push({l:(ALLSLOTS.filter(function(s){return s.k===k})[0]||{}).l||k,src:ph[k].data||ph[k].thumb})}});
-      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:p.typ||[],geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',fotos:fotos};
+      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',fotos:fotos};
       while(JSON.stringify(snap).length>220000&&snap.fotos.length)snap.fotos.pop();
       await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',snap:snap,sentAt:Date.now()});
       m[p.id]=Object.assign({},m[p.id],{st:'gesendet',sentAt:Date.now()});
@@ -1520,6 +1571,25 @@ function kZoom(key){
   if(!items.length)return;
   state.gallery=items;state.detailLoad=null;$('#lb').hidden=false;showGal(0);
 }
+async function loadBuchungen(){
+  var arr=[];
+  try{var qs=await db.collection('buchungen/'+uid+'/e').get();arr=qs.docs.map(function(d){return d.data()||{}})}catch(e){}
+  arr.sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
+  var h='<div class="selfwrap"><h2 style="font-size:26px">Deine Buchungen</h2>';
+  if(!arr.length)return h+'<p class="cl" style="margin:4px 0 0">Noch keine Buchungen. Die Agentur meldet sich per E-Mail bei dir.</p></div>';
+  return h+'<div class="rolegrid" style="margin-top:12px">'+arr.map(function(b){
+    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht. Weitere Infos bekommst du per E-Mail.</div></div>';
+  }).join('')+'</div></div>';
+}
+async function renderBuch(){
+  var host=$('#v-buch');
+  $('#count').textContent='Anfragen und Buchungen';
+  if(!db||state.nodb||!uid){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2><p class="cl">Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';return}
+  host.innerHTML='<div class="selfwrap"><p class="cl">Wird geladen …</p></div>';
+  var bk=await loadBuchungen(),anf=await loadAnfragen();
+  if(state.view!=='buch')return;
+  host.innerHTML=bk+(anf||'<div class="selfwrap"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 0">Gerade gibt es keine offenen Anfragen.</p></div>');
+}
 async function loadAnfragen(){
   var out='';
   try{
@@ -1527,7 +1597,7 @@ async function loadAnfragen(){
     var arr=qs.docs.map(function(d){return d.data()||{}}).filter(function(a){return (a.rollen||[]).length||(a.tage||[]).length});
     arr.sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
     if(arr.length){
-      out='<div class="selfwrap"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 12px">Dafür sucht die Agentur gerade Leute. Trage unten im Kalender ein, wann du Zeit hast.</p><div class="rolegrid">'+arr.map(function(a){
+      out='<div class="selfwrap"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 12px">Dafür sucht die Agentur gerade Leute. Trage in deinem Profil im Kalender ein, wann du Zeit hast.</p><div class="rolegrid">'+arr.map(function(a){
         var tg=(a.tage||[]).filter(function(t){return t.von}).map(function(t){return t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von)}).join(', ');
         return '<div class="role"><b>'+esc(tg||'Termin offen')+'</b>'+(a.ort?'<div class="cl">'+esc(a.ort)+'</div>':'')+(a.rollen||[]).map(function(r){return '<div style="margin-top:6px"><span class="pill">'+esc(r.typ||'Rolle')+'</span> '+(r.anzahl?'<span class="cm">× '+r.anzahl+'</span> ':'')+esc(r.name||'')+'<div class="cl">'+esc((r.krit||[]).filter(function(x){return x!==r.typ}).join(' · '))+(r.beschr?(r.krit&&r.krit.length?' · ':'')+esc(r.beschr):'')+'</div></div>'}).join('')+'</div>';
       }).join('')+'</div></div>';
@@ -1540,7 +1610,7 @@ async function removeProj(){
   var pr=curProj();if(!pr)return;
   try{
     await db.doc('projekte/'+pr.id).delete();
-    if(isAdmin)syncAusschreibung(pr.id,null);
+    if(isAdmin){syncAusschreibung(pr.id,null);Object.keys(pr.auswahl||{}).forEach(function(k){if(pr.auswahl[k].st==='gebucht'){try{db.doc('buchungen/'+k+'/e/'+pr.id).delete().catch(function(){})}catch(e){}}})}
     if(role==='kunde'){try{var kq=await db.collection('kunden/'+uid+'/auswahl').get();for(var qi=0;qi<kq.docs.length;qi++){if((kq.docs[qi].data()||{}).projId===pr.id)await db.doc('kunden/'+uid+'/auswahl/'+kq.docs[qi].id).delete()}}catch(e){}}
     state.projects=state.projects.filter(function(x){return x.id!==pr.id});
     state.confirmDelP=false;state.kDelId='';state.pid='';toast('Projekt gelöscht');if(state.view==='kunde')renderKunde();else renderProj();
