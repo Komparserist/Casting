@@ -180,6 +180,10 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .navtabs .tab{padding:9px 18px}
 .pbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
 .pbar select{flex:1 1 240px;width:auto;min-width:0;min-height:40px}
+.pj{display:block;width:100%;text-align:left;background:var(--surface,#fff);color:inherit;border:1px solid var(--line,#ddd);border-radius:10px;padding:12px 14px;margin-top:10px;cursor:pointer;font:inherit}
+.pj:hover{border-color:var(--accent)}
+.pj h3{font-size:20px;line-height:1.15;margin:0 0 4px;overflow-wrap:anywhere}
+.ptabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .pcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}
 .pcard h2{font-size:32px;line-height:1.05;overflow-wrap:anywhere}
 .days{display:flex;flex-wrap:wrap;gap:6px}
@@ -516,7 +520,7 @@ var TOGGLES=[
  {k:'brille',label:'Brillenträger'}
 ];
 
-var state={people:[],users:[],q:'',typ:'alle',sort:'name',f:newFilters(),loaded:false,nodb:false,err:'',panelSig:'',confirmEx:false,photoEdits:{},photoDocs:{},photoLoad:null,gallery:[],galIdx:0,cal:null,detailLoad:null,view:'kartei',projects:[],pid:'',roleSel:'',pdraft:null,confirmDelP:false,confirmSelf:false,kDelId:'',selfOk:false,decAll:{},decKey:'',decUnsub:null,sending:false,kdocs:{}};
+var state={people:[],users:[],pOpen:false,ptab:'neu',pq:'',pfirma:'',psort:'tag',q:'',typ:'alle',sort:'name',f:newFilters(),loaded:false,nodb:false,err:'',panelSig:'',confirmEx:false,photoEdits:{},photoDocs:{},photoLoad:null,gallery:[],galIdx:0,cal:null,detailLoad:null,view:'kartei',projects:[],pid:'',roleSel:'',pdraft:null,confirmDelP:false,confirmSelf:false,kDelId:'',selfOk:false,decAll:{},decKey:'',decUnsub:null,sending:false,kdocs:{}};
 var db=ctx.db,canWrite=true,role=ctx.role,isAdmin=ctx.role==='admin',uid=ctx.uid,myName=ctx.name||'',myEmail=ctx.email||'';
 
 function $(s,r){return (r||document).querySelector(s)}
@@ -533,24 +537,41 @@ function effTyp(p){return allTyp(p).filter(function(t){return t!=='Schauspieler'
 function typLabel(p,t){return t==='Schauspieler'&&!schOK(p)?'Schauspieler (Nachweis offen)':t}
 function tageStr(tage){return (tage||[]).filter(function(t){return t.von}).map(function(t){return t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von)}).join(', ')}
 function schNotice(){
-  return '<p class="warn" style="margin:8px 0 0;font-weight:500">Hinweis zu Schauspieler: Schicke deinen Ausbildungsnachweis per E-Mail an die Agentur'+(AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'')+'. Bis sie ihn bestätigt hat, wirst du nur als Komparse (und, wenn du Erfahrung mit Sprech- oder Tagesrollen angibst, als Kleindarsteller) vorgeschlagen, sonst gar nicht. Nach dem Speichern kann nur die Agentur „Schauspieler“ ändern, ein Wechsel geht nur auf Anfrage per E-Mail. Die Gage wird mit jedem Projekt neu verhandelt.</p>';
+  return '<p class="warn" style="margin:8px 0 0;font-weight:500">Hinweis zu Schauspieler: Schicke deinen Ausbildungsnachweis per E-Mail an die Agentur'+(AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'')+'. Bis sie ihn bestätigt hat, wirst du nur für die unten angekreuzten Rollen (Komparse, Kleindarsteller) vorgeschlagen, sonst gar nicht. Die Gage wird mit jedem Projekt neu verhandelt.</p>';
 }
+function baseKat(p){
+  var t=p.typ||[];
+  if(t.indexOf('Schauspieler')>=0)return 'sch';
+  if(t.indexOf('Komparse')>=0)return 'komp';
+  if(t.indexOf('Kleindarsteller')>=0||isKD(p))return 'kd';
+  return '';
+}
+function safeUrl(u){
+  u=String(u||'').trim();if(!u)return '';
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u))u='https://'+u;
+  return /^https?:\/\/[^\s]+\.[^\s]+/i.test(u)?u:'';
+}
+function linkHTML(u){var s=safeUrl(u);return s?'<a href="'+esc(s)+'" target="_blank" rel="noopener noreferrer">'+esc(s.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a>':''}
 function typBlock(p,self){
-  var locked=!!(self&&p.id&&(p.typ||[]).length||self&&p.id&&isKD(p));
-  var sch=hasSch(p);
-  var h='<div class="fld" style="margin-top:12px"><div class="fl">Kategorie</div><div class="chips">';
-  ['Schauspieler','Kleindarsteller','Komparse'].forEach(function(o){
-    var on=(p.typ||[]).indexOf(o)>=0,dis=locked&&o==='Schauspieler',lab=o,wid='';
-    if(self&&o==='Kleindarsteller'){lab='Auch für KD Rollen berücksichtigen';wid=' id="kdchip"'+(sch?'':' hidden')}
-    if(self&&o==='Komparse'){wid=' id="kompchip"';lab=sch?'Auch für Komparsenrollen berücksichtigen':'Komparse'}
-    if(o==='Schauspieler'&&on&&self)lab+=schOK(p)?' (bestätigt)':' (Nachweis offen)';
-    h+='<label class="chip chk"'+wid+'><input type="checkbox" name="typ" value="'+o+'"'+(on?' checked':'')+(dis?' disabled':'')+'><span>'+esc(lab)+'</span></label>';
-  });
-  h+='</div>';
-  if(self){
-    h+='<p class="cl" style="margin:6px 0 0">Wer Erfahrung mit Sprech- oder Tagesrollen hat, wird zusätzlich als Kleindarsteller (KD) geführt (Angabe weiter unten).'+(locked?' „Schauspieler“ kann nur die Agentur ändern, schreibe ihr dazu eine E-Mail'+(AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'')+'.':'')+'</p>';
-    h+='<div id="schnote"'+(hasSch(p)&&!(locked&&schOK(p))?'':' hidden')+'>'+schNotice()+'</div>';
-  }else if(p.selbst)h+='<label class="consent" id="gepwrap" style="margin-top:10px"'+(hasSch(p)?'':' hidden')+'><input type="checkbox" id="f-geprueft"'+(p.schauspielerStatus==='geprueft'?' checked':'')+'><span>Ausbildungsnachweis liegt vor, als Schauspieler bestätigt</span></label>';
+  var kat=baseKat(p),h='<div class="fld" style="margin-top:12px"><div class="fl">Kategorie</div>';
+  if(self&&kat){
+    var t=p.typ||[],mail=AGENTUR_MAIL?' ('+esc(AGENTUR_MAIL)+')':'';
+    h+='<div class="tags">';
+    if(kat==='sch')h+='<span class="pill">'+(p.schauspielerStatus==='geprueft'?'Schauspieler (bestätigt)':'Schauspieler (Nachweis offen)')+'</span>';
+    else if(kat==='komp')h+='<span class="pill">Komparse</span>'+(isKD(p)?'<span class="pill">Kleindarsteller</span>':'');
+    else h+='<span class="pill">Kleindarsteller</span>';
+    h+='</div>';
+    if(kat==='sch'){
+      h+='<div class="chips" style="margin-top:10px"><label class="chip chk"><input type="checkbox" name="typ" value="Komparse"'+(t.indexOf('Komparse')>=0?' checked':'')+'><span>Auch für Komparsenrollen berücksichtigen</span></label><label class="chip chk"><input type="checkbox" name="typ" value="Kleindarsteller"'+(t.indexOf('Kleindarsteller')>=0?' checked':'')+'><span>Auch für Kleindarstellerrollen berücksichtigen</span></label></div>';
+      if(p.schauspielerStatus!=='geprueft')h+=schNotice();
+      h+='<p class="cl" style="margin:8px 0 0">„Schauspieler“ kann nur die Agentur ändern. Schreibe ihr dazu eine E-Mail'+mail+'.</p>';
+    }else h+='<p class="cl" style="margin:8px 0 0">Zum Schauspieler kannst du nicht selbst wechseln. Schreibe dafür der Agentur eine E-Mail'+mail+'.</p>';
+    return h+'</div>';
+  }
+  var opts=self?['Schauspieler','Komparse']:['Schauspieler','Kleindarsteller','Komparse'];
+  h+=checks('typ',opts,p.typ||[]);
+  if(self)h+='<div id="schnote"'+(hasSch(p)?'':' hidden')+'>'+schNotice()+'</div>';
+  else if(p.selbst)h+='<label class="consent" id="gepwrap" style="margin-top:10px"'+(hasSch(p)?'':' hidden')+'><input type="checkbox" id="f-geprueft"'+(p.schauspielerStatus==='geprueft'?' checked':'')+'><span>Ausbildungsnachweis liegt vor, als Schauspieler bestätigt</span></label>';
   return h+'</div>';
 }
 function newFilters(){
@@ -762,6 +783,7 @@ function detailHTML(p,confirmDel,ro){
   h+='<div class="sec"><h3>Fertigkeiten</h3>'+chipList(p.fertigkeiten)+'</div>';
   h+='<div class="sec"><h3>Führerschein</h3>'+chipList(p.fuehrerschein)+'</div>';
   if(p.erfahrung)h+='<div class="sec"><h3>Erfahrung</h3><div class="notes">'+esc(p.erfahrung)+'</div></div>';
+  if(linkHTML(p.link))h+='<div class="sec"><h3>Link</h3><div class="notes">'+linkHTML(p.link)+'</div></div>';
   h+='<div class="sec"><h3>Kontakt und Konditionen</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
     (hasSch(p)&&p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl><p class="cl" style="margin:4px 0 0">Die Gage kann mit jedem Projekt neu verhandelt werden.</p>':'')+
     (!p.telefon&&!p.email&&!p.instagram&&!p.social&&!(hasSch(p)&&p.gage!=null&&p.gage!=='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
@@ -816,8 +838,9 @@ function formHTML(p,self){
     '<div class="fld" style="margin-top:12px"><div class="fl">Fertigkeiten</div>'+checks('fertigkeiten',optsFor(gSk),p.fertigkeiten||[])+'</div>'+
     '<div class="fld" style="margin-top:8px"><label for="f-skillsx">Weitere Fertigkeiten, durch Komma getrennt</label><input id="f-skillsx" autocomplete="off"></div>'+
     '<div class="fld" style="margin-top:12px"><div class="fl">Führerschein</div>'+checks('fuehrerschein',optsFor(gFs),p.fuehrerschein||[])+'</div>'+
-    '<div class="fld" style="margin-top:12px"><div class="fl">Rollenerfahrung <span class="hint">Mit Angabe wirst du zusätzlich als Kleindarsteller (KD) geführt</span></div><label class="consent"><input type="checkbox" id="f-sprech"'+(p.sprechrollen?' checked':'')+'><span>Erfahrung mit Textrollen</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="f-tages"'+(p.tagesrollen?' checked':'')+'><span>Erfahrung mit Tagesrollen</span></label></div>'+
-    '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div></fieldset>';
+    (self&&hasSch(p)?'':'<div class="fld" style="margin-top:12px"><div class="fl">Rollenerfahrung</div><label class="consent"><input type="checkbox" id="f-tages"'+(p.tagesrollen?' checked':'')+'><span>Ich habe Erfahrung mit Tagesrollen (ohne Text)</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="f-sprech"'+(p.sprechrollen?' checked':'')+'><span>Ich habe Erfahrung mit Textrollen</span></label></div>')+
+    '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div>'+
+    '<div class="fld" style="margin-top:12px"><label for="f-link">Link zu Vorstellungsvideo, Homepage oder externem Profil</label><input id="f-link" type="text" inputmode="url" autocomplete="off" placeholder="z. B. vimeo.com/… oder meine-seite.de" value="'+esc(p.link||'')+'"></div></fieldset>';
   h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
     inp('f-telefon','Telefon',p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',p.email,'type="text" inputmode="email" autocomplete="off"')+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
     (self?'':'<div id="gagefld"'+(hasSch(p)?'':' hidden')+'>'+inp('f-gage','Tagesgage (€), nur Schauspieler',p.gage,'inputmode="decimal"')+'<p class="cl" style="margin:4px 0 0">Nur intern. Die Gage kann mit jedem Projekt neu verhandelt werden.</p></div>')+'</div>'+
@@ -853,6 +876,7 @@ function checked(name){return Array.prototype.map.call(document.querySelectorAll
 function extra(id){var e=$('#'+id);return (e?e.value:'').split(',').map(function(s){return s.trim()}).filter(Boolean)}
 function uniq(a){return a.filter(function(x,i){return a.indexOf(x)===i})}
 function val(id){var e=$('#'+id);return e?e.value.trim():''}
+function oldF(){return state.selfBase||{}}
 function readForm(self){
   var d={
     vorname:val('f-vorname'),nachname:val('f-nachname'),geschlecht:val('f-geschlecht'),
@@ -860,13 +884,17 @@ function readForm(self){
     plz:val('f-plz'),ort:val('f-ort'),agentur:val('f-agentur'),typ:checked('typ'),
     groesse:num(val('f-groesse')),gewicht:num(val('f-gewicht')),konfektion:val('f-konfektion'),schuh:num(val('f-schuh')),
     haarfarbe:val('f-haarfarbe'),haarlaenge:val('f-haarlaenge'),augenfarbe:val('f-augenfarbe'),bart:val('f-bart'),tattoos:val('f-tattoos'),
-    brille:$('#f-brille').checked,sprechrollen:$('#f-sprech').checked,tagesrollen:$('#f-tages').checked,
+    brille:$('#f-brille').checked,sprechrollen:$('#f-sprech')?$('#f-sprech').checked:!!(oldF().sprechrollen),tagesrollen:$('#f-tages')?$('#f-tages').checked:!!(oldF().tagesrollen),link:safeUrl(val('f-link')),
     sprachen:uniq(checked('sprachen').concat(extra('f-sprachenx'))),dialekte:val('f-dialekte'),
     fertigkeiten:uniq(checked('fertigkeiten').concat(extra('f-skillsx'))),fuehrerschein:checked('fuehrerschein'),
     erfahrung:val('f-erfahrung'),telefon:val('f-telefon'),email:val('f-email'),instagram:val('f-instagram'),social:val('f-social'),gage:num(val('f-gage')),
     notizen:val('f-notizen'),einwilligung:$('#f-einw').checked
   };
-  if(self){delete d.agentur;delete d.gage;delete d.notizen;if(d.typ.indexOf('Schauspieler')<0)d.typ=d.typ.filter(function(t){return t!=='Kleindarsteller'})}
+  if(self){
+    delete d.agentur;delete d.gage;delete d.notizen;
+    var kt=baseKat(oldF());
+    if(kt==='sch')d.typ=['Schauspieler'].concat(checked('typ'));else if(kt==='komp')d.typ=['Komparse'];else if(kt==='kd')d.typ=['Kleindarsteller'];
+  }
   else{
     var isS=d.typ.indexOf('Schauspieler')>=0,gp=$('#f-geprueft');
     if(!isS)d.gage=null;
@@ -939,6 +967,9 @@ document.addEventListener('click',function(e){
   else if(act==='clear'){state.f=newFilters();state.q='';$('#q').value='';refreshPanel(true);renderList()}
   else if(act==='open'){var p=findP(id);if(p){var ro=!!t.closest('#v-proj');openSheet(detailHTML(p,false,ro));startDetail(p)}}
   else if(act==='avail'){var ap=findP(id),sec=$('#availsec');if(ap&&sec&&state.cal){sec.innerHTML='<h3>Verfügbarkeit ändern</h3>'+calHTML(ap,true);sec.scrollIntoView({block:'start'});t.hidden=true}}
+  else if(act==='ptab'){state.ptab=t.dataset.v;fillPList()}
+  else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
+  else if(act==='pback'){state.pOpen=false;state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
   else if(act==='pfreig'||act==='pablehn'||act==='schbest'){setPerson(id,act)}
   else if(act==='ufreig'||act==='uablehn'){setUser(id,act)}
   else if(act==='buchen'){bookSel(id);closeSheet()}
@@ -995,6 +1026,7 @@ document.addEventListener('input',function(e){
   if(t.dataset&&t.dataset.pf&&state.pdraft){state.pdraft[t.dataset.pf]=t.type==='checkbox'?t.checked:t.value}
   else if(t.dataset&&t.dataset.pt!=null&&t.dataset.pt!==''&&state.pdraft){state.pdraft.tage[+t.dataset.pt][t.dataset.k]=t.value}
   else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
+  else if(t.id==='pq'){state.pq=t.value;fillPList()}
   else if(t.id==='q'){state.q=t.value.trim();renderList()}
   else if(t.dataset&&t.dataset.r){state.f.r[t.dataset.r][t.dataset.b]=t.value.trim();renderList()}
   else if(t.dataset&&t.dataset.spiel){state.f.spiel=t.value.trim();renderList()}
@@ -1004,6 +1036,8 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   var t=e.target;
+  if(t.id==='pfirma'){state.pfirma=t.value;fillPList();return}
+  if(t.id==='psort'){state.psort=t.value;fillPList();return}
   if(t.name==='typ'&&t.closest&&t.closest('#form')){
     var sch=!!document.querySelector('#form input[name="typ"][value="Schauspieler"]:checked');
     ['schnote','gepwrap','gagefld','kdchip'].forEach(function(i){var el=$('#'+i);if(el)el.hidden=!sch});
@@ -1270,7 +1304,8 @@ async function renderSelf(note){
   state.selfP=p;resetPhotoState();
   state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
   var rg=ctx.reg||{},pre={email:myEmail,vorname:(myName||'').split(' ')[0]||'',nachname:(myName||'').split(' ').slice(1).join(' ')||''};
-  if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();if(pre.typ.indexOf('Schauspieler')>=0)pre.typ.push('Kleindarsteller');pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
+  if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
+  state.selfBase=p||pre;
   var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':p&&p.freigabe==='ok'?'<p class="okmsg" role="status">Dein Profil ist freigegeben.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>';
   host.innerHTML=h;
   if(p&&p.hasFoto){state.photoLoad=loadPhotos(p).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}
@@ -1280,7 +1315,8 @@ async function saveSelf(){
   var d=readForm(true);
   if(!d.vorname&&!d.nachname){err.textContent='Trage deinen Namen ein.';$('#f-vorname').focus();return}
   if(d.geburtsjahr!=null&&(d.geburtsjahr<1900||d.geburtsjahr>YEAR)){err.textContent='Das Geburtsjahr muss zwischen 1900 und '+YEAR+' liegen.';$('#f-geburtsjahr').focus();return}
-  if(!d.typ.length&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle Schauspieler oder Komparse, oder gib Erfahrung mit Sprech- oder Tagesrollen an.';return}
+  if(!d.typ.length&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle Schauspieler oder Komparse, oder gib Erfahrung mit Text- oder Tagesrollen an.';return}
+  if(baseKat(oldF())==='kd'&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle mindestens eine Erfahrung aus: Tagesrollen oder Textrollen.';return}
   if(!d.telefon&&!d.email){err.textContent='Trage Telefon oder E-Mail ein, damit dich die Agentur erreichen kann.';$('#f-telefon').focus();return}
   if(!d.einwilligung){err.textContent='Ohne deine Einwilligung darf das Profil nicht gespeichert werden.';return}
   if(!uid){err.textContent='Du bist nicht angemeldet.';return}
@@ -1370,17 +1406,93 @@ function availFor(p,days){
   var free=inw.filter(function(d){return set.has(d)}).length;
   return {rel:rel.length,inw:inw.length,free:free,out:rel.length-inw.length};
 }
-function renderProj(){
+/* ---------- Projekte: Liste mit Reitern, Suche, Sortierung, Firmenfilter ---------- */
+var PTABS=[['neu','Neue Projekte'],['mit','Mit Auswahl'],['voll','Ausgebucht'],['abg','Abgeschlossen']];
+function firmOf(pr){return pr.produktion||pr.erstellerName||'Ohne Firma'}
+function bookedCount(pr,r){
+  var sel=pr.auswahl||{},n=0,single=(pr.rollen||[]).length===1;
+  Object.keys(sel).forEach(function(id){
+    var e=sel[id];if(e.st!=='gebucht')return;
+    if(e.rolleId)n+=e.rolleId===r.id?1:0;
+    else if(e.rolle)n+=e.rolle===(r.name||'')?1:0;
+    else if(single)n++;
+  });
+  return n;
+}
+function projStatus(pr){
+  var days=projDays(pr),t=todayStr(),sel=pr.auswahl||{},roles=pr.rollen||[];
+  if(days.length&&days[days.length-1]<t)return 'abg';
+  if(roles.length&&roles.every(function(r){return bookedCount(pr,r)>=(+r.anzahl||1)}))return 'voll';
+  if(Object.keys(sel).some(function(id){return sel[id].st&&sel[id].st!=='auswahl'}))return 'mit';
+  return 'neu';
+}
+function projFiltered(){
+  var q=state.pq.toLowerCase().split(/\s+/).filter(Boolean);
+  return state.projects.filter(function(pr){
+    if(state.pfirma&&firmOf(pr)!==state.pfirma)return false;
+    if(!q.length)return true;
+    var hay=[pr.name,pr.produktion,pr.erstellerName,pr.ort,pr.notiz,pr.regieName,pr.regieMail].concat((pr.rollen||[]).map(function(r){return (r.name||'')+' '+(r.beschr||'')}),(pr.tage||[]).map(function(t){return tageStr([t])})).join(' ').toLowerCase();
+    return q.every(function(w){return hay.indexOf(w)>=0});
+  });
+}
+function projDay(pr,tab){
+  var d=projDays(pr);if(!d.length)return tab==='abg'?'':'9999-99-99';
+  if(tab==='abg')return d[d.length-1];
+  var t=todayStr(),n=d.filter(function(x){return x>=t})[0];return n||d[0];
+}
+function projCardHTML(pr){
+  var tg=tageStr(pr.tage),sel=pr.auswahl||{},ids=Object.keys(sel),sent=ids.filter(function(i){return sel[i].st&&sel[i].st!=='auswahl'}).length,draft=ids.length-sent;
+  var roles=pr.rollen||[],need=0,have=0;roles.forEach(function(r){var n=+r.anzahl||1;need+=n;have+=Math.min(n,bookedCount(pr,r))});
+  var meta=[firmOf(pr)!=='Ohne Firma'?firmOf(pr):'',pr.ort].filter(Boolean).join(' · ');
+  var tags='';
+  if(roles.length)tags+='<span class="pill">Besetzt '+have+' von '+need+'</span> ';
+  if(sent)tags+='<span class="cl">'+sent+' Profil'+(sent===1?'':'e')+' beim Kunden</span> ';
+  if(draft)tags+='<span class="cl">'+draft+' in Auswahl</span>';
+  return '<button type="button" class="pj" data-act="popen" data-id="'+esc(pr.id)+'"><h3>'+esc(pr.name||'Ohne Namen')+'</h3>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+'<div class="cl">'+(tg?esc(tg):'Noch keine Drehtage')+'</div>'+(tags?'<div style="margin-top:6px">'+tags+'</div>':'')+'</button>';
+}
+function fillPList(){
+  var box=$('#plist');if(!box)return;
+  var all=projFiltered(),by={neu:[],mit:[],voll:[],abg:[]};
+  all.forEach(function(pr){by[projStatus(pr)].push(pr)});
+  var firms=Array.from(new Set(state.projects.map(firmOf))).sort(function(a,b){return a.localeCompare(b,'de')});
+  var fs=$('#pfirma');
+  if(state.pfirma&&firms.indexOf(state.pfirma)<0)state.pfirma='';
+  if(fs)fs.innerHTML='<option value="">Alle Firmen</option>'+firms.map(function(f){return '<option value="'+esc(f)+'"'+(f===state.pfirma?' selected':'')+'>'+esc(f)+'</option>'}).join('');
+  var h='<div class="ptabs">'+PTABS.map(function(t){return '<button type="button" class="chip'+(state.ptab===t[0]?' on':'')+'" data-act="ptab" data-v="'+t[0]+'" aria-pressed="'+(state.ptab===t[0])+'">'+t[1]+' ('+by[t[0]].length+')</button>'}).join('')+'</div>';
+  var cur=by[state.ptab].slice(),tab=state.ptab;
+  if(state.psort==='name')cur.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')});
+  else cur.sort(function(a,b){var x=projDay(a,tab),y=projDay(b,tab);return (tab==='abg'?y.localeCompare(x):x.localeCompare(y))||String(a.name||'').localeCompare(String(b.name||''),'de')});
+  if(cur.length)h+=cur.map(projCardHTML).join('');
+  else{
+    var filt=state.pq||state.pfirma;
+    var msg={neu:'Hier erscheinen Projekte, für die noch keine Auswahl an den Kunden gesendet wurde.',mit:'Hier erscheinen Projekte, bei denen der Kunde schon eine Auswahl bekommen hat.',voll:'Hier erscheinen Projekte, bei denen alle Rollen besetzt sind.',abg:'Hier erscheinen Projekte, deren Drehtage in der Vergangenheit liegen.'}[tab];
+    h+='<div class="empty" style="margin-top:12px"><h3>'+(filt?'Nichts gefunden':'Keine Projekte')+'</h3><p>'+(filt?'In diesem Reiter passt kein Projekt zu Suche und Firmenfilter. Schau in den anderen Reitern nach.':msg)+'</p></div>';
+  }
+  box.innerHTML=h;
+}
+function renderProjList(){
   var host=$('#v-proj');
-  var list=state.projects.slice().sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')});
-  if(!list.some(function(x){return x.id===state.pid}))state.pid=list.length?list[0].id:'';
+  $('#count').textContent=state.projects.length?state.projects.length+' Projekt'+(state.projects.length===1?'':'e'):'Noch keine Projekte';
+  if(!state.loaded){host.innerHTML='<div class="empty" style="margin-top:12px"><h3>Wird geladen</h3></div>';return}
+  if(!host.querySelector('#pq')){
+    host.innerHTML='<div class="pbar"><input type="search" id="pq" style="flex:2 1 220px" placeholder="Suchen: Name, Firma, Drehort, Rolle …" aria-label="Projekte durchsuchen" value="'+esc(state.pq)+'" autocomplete="off"><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div>'+
+      '<div class="pbar"><select id="pfirma" aria-label="Nach Firma filtern"></select><select id="psort" aria-label="Sortieren"><option value="tag"'+(state.psort==='tag'?' selected':'')+'>Sortieren: Drehtag</option><option value="name"'+(state.psort==='name'?' selected':'')+'>Sortieren: Name A–Z</option></select></div><div id="plist"></div>';
+  }
+  fillPList();
+}
+function renderProj(){
+  if(state.pid&&!curProj())state.pid='';
+  if(state.pOpen&&state.pid)renderProjDetail();else{state.pOpen=false;renderProjList()}
+}
+function renderProjDetail(){
+  var host=$('#v-proj');
   var pr=curProj();
-  $('#count').textContent=list.length?list.length+' Projekt'+(list.length===1?'':'e'):'Noch keine Projekte';
-  var h='<div class="pbar"><select id="psel" aria-label="Projekt wählen">'+(list.length?list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===state.pid?' selected':'')+'>'+esc(x.name||'Ohne Namen')+'</option>'}).join(''):'<option value="">Kein Projekt vorhanden</option>')+'</select><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div>';
+  $('#count').textContent=pr?(pr.name||'Projekt'):'Projekt';
+  var h='<div class="pbar"><button type="button" class="btn" data-act="pback">← Alle Projekte</button><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div>';
   if(!state.loaded){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Wird geladen</h3></div>';return}
   if(!pr){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Lege ein Projekt mit Drehtagen und Rollen an. Danach siehst du sofort, wer verfügbar ist und passt.</p></div>';return}
   var days=projDays(pr),roles=pr.rollen||[];
-  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
+  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span></p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
   h+='<div class="sec" style="margin-top:14px"><h3>Drehtage</h3>'+((pr.tage||[]).filter(function(t){return t.von}).length?'<div class="days">'+(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('')+'</div><p class="cl" style="margin:6px 0 0">'+days.length+' Drehtag'+(days.length===1?'':'e')+' insgesamt</p>':'<span class="cl">Noch keine Drehtage eingetragen</span>')+'</div>';
   if(pr.regieName||pr.regieMail||pr.regieTel||pr.ort)h+='<div class="sec"><h3>Regie und Ort</h3>'+(pr.regieName?'<div class="cm">'+esc(pr.regieName)+'</div>':'')+copyRow(pr.regieMail)+copyRow(pr.regieTel)+(pr.ort?'<div class="cl">Drehort: '+esc(pr.ort)+'</div>':'')+(pr.oeffentlich?'<div class="cl">Für Bewerber sichtbar</div>':'')+'</div>';
   h+='<div class="sec"><h3>Anforderungen</h3>'+(roles.length?'<div class="rolegrid">'+roles.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div>'+(r.beschr?'<div class="cl">'+esc(r.beschr)+'</div>':'')+'</div>'}).join('')+'</div>':'<span class="cl">Keine Rollen angelegt, es werden alle Profile nach Verfügbarkeit gezeigt.</span>')+'</div>';
@@ -1495,7 +1607,7 @@ async function saveProj(){
     else if(old&&old.ersteller){rec.ersteller=old.ersteller;if(old.erstellerName)rec.erstellerName=old.erstellerName}
     await ref.set(rec);
     if(isAdmin)syncAusschreibung(ref.id,rec);
-    state.pid=ref.id;state.roleSel='';
+    state.pid=ref.id;state.roleSel='';if(isAdmin)state.pOpen=true;
     toast('Projekt gespeichert');
     closeSheet();
     state.projects=state.projects.filter(function(x){return x.id!==ref.id}).concat([Object.assign({id:ref.id},rec)]);
@@ -1543,7 +1655,7 @@ function addSel(pid){
   if(m[pid]){
     if(m[pid].st!=='auswahl'){toast('Schon gesendet oder gebucht. Entfernen geht in der Auswahl.');return}
     delete m[pid];
-  }else m[pid]={st:'auswahl',rolle:selRole(),at:Date.now()};
+  }else m[pid]={st:'auswahl',rolle:selRole(),rolleId:state.roleSel||'',at:Date.now()};
   saveSel(pr,m);
 }
 async function removeSel(pid){
@@ -1567,7 +1679,7 @@ function bookSel(pid){
   var pr=curProj();if(!pr)return;
   var p=findP(pid),m=Object.assign({},pr.auswahl||{});
   m[pid]=Object.assign({},m[pid]||{},{st:'gebucht',at:Date.now()});
-  var rolle=m[pid].rolle||selRole();m[pid].rolle=rolle;
+  var rolle=m[pid].rolle||selRole();m[pid].rolle=rolle;if(!m[pid].rolleId)m[pid].rolleId=state.roleSel||'';
   if(p&&p.email){var a=document.createElement('a');a.href=bookMail(p,pr,rolle);document.body.appendChild(a);a.click();a.remove();toast('Gebucht. Die Mail ist vorbereitet, tippe im Mailprogramm auf Senden.')}
   else toast('Als gebucht eingetragen. Im Profil steht keine E-Mail, daher keine Mail.');
   saveSel(pr,m);
@@ -1584,7 +1696,7 @@ async function sendSel(){
       try{ph=await loadPhotos(p)}catch(e){}
       var fotos=[];
       ['portrait','ganzkoerper','profil'].forEach(function(k){if(ph[k]){fotos.push({l:(ALLSLOTS.filter(function(s){return s.k===k})[0]||{}).l||k,src:ph[k].data||ph[k].thumb})}});
-      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',fotos:fotos};
+      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',link:safeUrl(p.link),fotos:fotos};
       while(JSON.stringify(snap).length>220000&&snap.fotos.length)snap.fotos.pop();
       await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',snap:snap,sentAt:Date.now()});
       m[p.id]=Object.assign({},m[p.id],{st:'gesendet',sentAt:Date.now()});
@@ -1628,7 +1740,7 @@ async function renderKunde(){
       var meta=[s.alter!=null?s.alter+' J':null,s.groesse?s.groesse+' cm':null,s.konfektion?'Gr. '+s.konfektion:null].filter(Boolean).join(' · ');
       var look=[s.haarfarbe,s.haarlaenge?'Haar '+s.haarlaenge:null,s.augenfarbe?'Augen '+s.augenfarbe:null,s.bart].filter(Boolean).join(' · ');
       var fo=(s.fotos&&s.fotos.length)?s.fotos[0].src:s.thumb;
-      h+='<div class="mwrap"><div class="card kc"><button type="button" class="ph zoomable" data-act="kzoom" data-key="'+esc(d.key)+'" aria-label="Fotos ansehen">'+(fo?'<img alt="" src="'+esc(s.thumb||fo)+'">':esc(((s.vorname||'').charAt(0)+(s.nachname||'').charAt(0)).toUpperCase()||'?'))+'</button><div class="ci"><div class="cn">'+esc((s.vorname||'')+' '+(s.nachname||''))+'</div>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+(look?'<div class="cl">'+esc(look)+'</div>':'')+'<div class="tags">'+(s.typ||[]).map(function(t){return '<span class="pill">'+esc(t)+'</span>'}).join('')+(s.ort?'<span class="cl">'+esc(s.ort)+'</span>':'')+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'')+'</div>'+((s.sprachen||[]).length||(s.fertigkeiten||[]).length?'<div class="cl">'+esc((s.sprachen||[]).concat(s.fertigkeiten||[]).join(', '))+'</div>':'')+'</div></div>'+
+      h+='<div class="mwrap"><div class="card kc"><button type="button" class="ph zoomable" data-act="kzoom" data-key="'+esc(d.key)+'" aria-label="Fotos ansehen">'+(fo?'<img alt="" src="'+esc(s.thumb||fo)+'">':esc(((s.vorname||'').charAt(0)+(s.nachname||'').charAt(0)).toUpperCase()||'?'))+'</button><div class="ci"><div class="cn">'+esc((s.vorname||'')+' '+(s.nachname||''))+'</div>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+(look?'<div class="cl">'+esc(look)+'</div>':'')+'<div class="tags">'+(s.typ||[]).map(function(t){return '<span class="pill">'+esc(t)+'</span>'}).join('')+(s.ort?'<span class="cl">'+esc(s.ort)+'</span>':'')+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'')+'</div>'+((s.sprachen||[]).length||(s.fertigkeiten||[]).length?'<div class="cl">'+esc((s.sprachen||[]).concat(s.fertigkeiten||[]).join(', '))+'</div>':'')+(linkHTML(s.link)?'<div class="cl">Link: '+linkHTML(s.link)+'</div>':'')+'</div></div>'+
         '<div class="pbar" style="margin:0"><button type="button" class="btn small'+(st==='bestaetigt'?' primary':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="bestaetigt">'+(st==='bestaetigt'?'Bestätigt ✓':'Bestätigen')+'</button><button type="button" class="btn small'+(st==='abgelehnt'?' danger':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="abgelehnt">'+(st==='abgelehnt'?'Abgelehnt ✓':'Ablehnen')+'</button></div></div>';
     });
     h+='</div>';
@@ -1768,10 +1880,10 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-let reg = { kat: '', tages: false, text: false, ausb: false };
+let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
 function buildReg() {
-  return { typ: reg.kat === 'komparse' ? ['Komparse'] : reg.kat === 'schauspieler' ? ['Schauspieler'] : [], tagesrollen: reg.kat === 'kd' && reg.tages, sprechrollen: reg.kat === 'kd' && reg.text, ausbildung: reg.kat === 'schauspieler' && reg.ausb };
+  return { typ: reg.kat === 'komparse' ? ['Komparse'] : reg.kat === 'kd' ? ['Kleindarsteller'] : reg.kat === 'schauspieler' ? ['Schauspieler'].concat(reg.komp ? ['Komparse'] : [], reg.kdopt ? ['Kleindarsteller'] : []) : [], tagesrollen: reg.kat === 'kd' && reg.tages, sprechrollen: reg.kat === 'kd' && reg.text, ausbildung: reg.kat === 'schauspieler' && reg.ausb };
 }
 
 async function renderAuth(msg, ok) {
@@ -1788,12 +1900,12 @@ async function renderAuth(msg, ok) {
     h += radio('kd', 'Kleindarsteller (KD)', 'Kleine Rollen, Tagesrollen oder Rollen mit wenig Text.');
     h += '<div class="subbox" data-for="kd"' + (reg.kat === 'kd' ? '' : ' hidden') + '><label class="consent"><input type="checkbox" id="r-tages"' + (reg.tages ? ' checked' : '') + '><span>Ich habe Erfahrung mit Tagesrollen</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="r-text"' + (reg.text ? ' checked' : '') + '><span>Ich habe Erfahrung mit Textrollen</span></label></div>';
     h += radio('schauspieler', 'Schauspieler', 'Mit abgeschlossener Schauspielausbildung.');
-    h += '<div class="subbox" data-for="schauspieler"' + (reg.kat === 'schauspieler' ? '' : ' hidden') + '><label class="consent"><input type="checkbox" id="r-ausb"' + (reg.ausb ? ' checked' : '') + '><span>Schauspielausbildung vorhanden<br><span class="cl">(Nachweis erforderlich)</span></span></label></div>';
+    h += '<div class="subbox" data-for="schauspieler"' + (reg.kat === 'schauspieler' ? '' : ' hidden') + '><label class="consent"><input type="checkbox" id="r-ausb"' + (reg.ausb ? ' checked' : '') + '><span>Schauspielausbildung vorhanden<br><span class="cl">(Nachweis erforderlich)</span></span></label><label class="consent" style="margin-top:8px"><input type="checkbox" id="r-komp"' + (reg.komp ? ' checked' : '') + '><span>Auch für Komparsenrollen berücksichtigen</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="r-kdopt"' + (reg.kdopt ? ' checked' : '') + '><span>Auch für Kleindarstellerrollen berücksichtigen</span></label></div>';
     h += '</div><div class="ferr" id="aerr" role="alert"></div><div class="acts" style="margin-top:6px;border:0;padding:0"><button type="button" class="btn primary" id="aweiter">Weiter</button></div>';
   } else {
     h += '<form id="aform" novalidate>';
     if (step2) {
-      if (!prod) h += '<p class="cl" style="margin:0 0 12px">Registrierung als <b>' + esc(KAT[reg.kat] || '') + '</b>' + (reg.kat === 'kd' ? ' (' + [reg.tages ? 'Tagesrollen' : '', reg.text ? 'Textrollen' : ''].filter(Boolean).join(', ') + ')' : '') + ' <button type="button" class="btn small" data-m="register">Ändern</button></p>';
+      if (!prod) h += '<p class="cl" style="margin:0 0 12px">Registrierung als <b>' + esc(KAT[reg.kat] || '') + '</b>' + (reg.kat === 'kd' ? ' (' + [reg.tages ? 'Tagesrollen' : '', reg.text ? 'Textrollen' : ''].filter(Boolean).join(', ') + ')' : reg.kat === 'schauspieler' && (reg.komp || reg.kdopt) ? ' (auch für ' + [reg.komp ? 'Komparsenrollen' : '', reg.kdopt ? 'Kleindarstellerrollen' : ''].filter(Boolean).join(' und ') + ')' : '') + ' <button type="button" class="btn small" data-m="register">Ändern</button></p>';
       h += '<div class="fld"><label for="a-name">' + (prod ? 'Name der Ansprechperson' : 'Name') + '</label><input id="a-name" autocomplete="name"></div>';
     }
     h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>';
@@ -1821,10 +1933,10 @@ document.addEventListener('click', async (e) => {
   if (t.dataset && t.dataset.m) { mode = t.dataset.m; renderAuth(); return; }
   if (t.id === 'aweiter') {
     const k = (document.querySelector('input[name=kat]:checked') || {}).value || '', err = $('#aerr');
-    reg.kat = k; reg.tages = !!($('#r-tages') || {}).checked; reg.text = !!($('#r-text') || {}).checked; reg.ausb = !!($('#r-ausb') || {}).checked;
+    reg.kat = k; reg.tages = !!($('#r-tages') || {}).checked; reg.text = !!($('#r-text') || {}).checked; reg.ausb = !!($('#r-ausb') || {}).checked; reg.komp = !!($('#r-komp') || {}).checked; reg.kdopt = !!($('#r-kdopt') || {}).checked;
     if (!k) { err.textContent = 'Wähle, als was du dich eintragen möchtest.'; return; }
     if (k !== 'kd') { reg.tages = false; reg.text = false; }
-    if (k !== 'schauspieler') reg.ausb = false;
+    if (k !== 'schauspieler') { reg.ausb = false; reg.komp = false; reg.kdopt = false; }
     if (k === 'kd' && !reg.tages && !reg.text) { err.textContent = 'Wähle mindestens eine Erfahrung aus: Tagesrollen oder Textrollen.'; return; }
     if (k === 'schauspieler' && !reg.ausb) { err.textContent = 'Als Schauspieler brauchst du eine Schauspielausbildung. Ohne Ausbildung wähle Kleindarsteller oder Komparse.'; return; }
     mode = 'register2'; renderAuth(); return;
