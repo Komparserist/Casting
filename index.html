@@ -251,6 +251,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
     <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte</button>
     <button type="button" class="tab" data-act="view" data-v="pruef" aria-pressed="false">Zu prüfen <span class="badge" id="pbadge" hidden>0</span></button>
     <button type="button" class="tab" data-act="view" data-v="self" aria-pressed="false">Mein Profil</button>
+    <button type="button" class="tab" data-act="view" data-v="edit" aria-pressed="false">Profil bearbeiten</button>
     <button type="button" class="tab" data-act="view" data-v="buch" aria-pressed="false">Anfragen und Buchungen</button>
     <button type="button" class="tab" data-act="view" data-v="kunde" aria-pressed="false">Für Produktionen</button>
   </nav>
@@ -283,6 +284,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
   <div id="v-proj" hidden></div>
   <div id="v-pruef" hidden></div>
   <div id="v-self" hidden></div>
+  <div id="v-edit" hidden></div>
   <div id="v-kunde" hidden></div>
   <div id="v-buch" hidden></div>
 </div>
@@ -768,20 +770,22 @@ function chipList(arr){return (arr&&arr.length)?'<div class="chips">'+arr.map(fu
 function fact(l,v,unit){return (v===''||v==null)?'':'<div><dt>'+l+'</dt><dd>'+esc(v)+(unit?' '+unit:'')+'</dd></div>'}
 function copyRow(v){return v?'<div class="copyrow"><span>'+esc(v)+'</span><button type="button" class="btn small" data-act="copy" data-v="'+esc(v)+'">Kopieren</button></div>':''}
 
-function detailHTML(p,confirmDel,ro){
+function detailHTML(p,confirmDel,ro,own){
   var age=ageOf(p);
-  var h='<div class="sh"><h2 id="sheetTitle">Profil</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
-  h+='<div class="dhead"><'+(p.thumb?'button type="button" class="ph zoomable" data-act="zoom" data-id="'+esc(p.id)+'" aria-label="Foto vergrößern"':'div class="ph"')+' id="dph">'+(p.thumb?'<img alt="Foto von '+esc(fullName(p))+'" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</'+(p.thumb?'button':'div')+'><div class="dn"><h2>'+esc(fullName(p))+'</h2><div class="tags">';
+  var h=own?'':'<div class="sh"><h2 id="sheetTitle">Profil</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
+  h+='<div class="dhead"><'+(p.thumb&&!own?'button type="button" class="ph zoomable" data-act="zoom" data-id="'+esc(p.id)+'" aria-label="Foto vergrößern"':'div class="ph"')+' id="dph">'+(p.thumb?'<img alt="Foto von '+esc(fullName(p))+'" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</'+(p.thumb&&!own?'button':'div')+'><div class="dn"><h2>'+esc(fullName(p))+'</h2><div class="tags">';
   allTyp(p).forEach(function(t){h+='<span class="pill">'+esc(typLabel(p,t))+'</span>'});
   if(p.selbst)h+='<span class="cl">selbst eingetragen</span>';
   h+='</div>';
   if(p.freigabe==='neu'||p.freigabe==='abgelehnt')h+='<p class="warn" style="margin:8px 0 0">'+(p.freigabe==='neu'?'Neues Profil, noch nicht freigegeben. Es wird erst nach der Freigabe für Projekte vorgeschlagen.':'Profil abgelehnt. Es wird nicht für Projekte vorgeschlagen.')+'</p>';
   if(hasSch(p)&&!schOK(p))h+='<p class="warn" style="margin:8px 0 0">Schauspieler-Nachweis noch offen'+(p.ausbildung?' (Schauspielausbildung angegeben)':'')+'. Wird nur als Komparse vorgeschlagen, falls auch Komparse gewählt ist.</p>';
   if(p.ort||p.plz||p.strasse)h+='<p class="cl" style="margin:8px 0 0">'+esc([p.strasse||'',((p.plz||'')+' '+(p.ort||'')).trim()].filter(Boolean).join(', '))+'</p>';
-  if(p.agentur)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
+  if(p.telefon)h+='<p class="cl" style="margin:2px 0 0">Telefon: '+esc(p.telefon)+'</p>';
+  if(p.email)h+='<p class="cl" style="margin:2px 0 0">E-Mail: '+esc(p.email)+'</p>';
+  if(p.agentur&&!own)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
   h+='</div></div>';
   if(p.hasFoto)h+='<div class="sec"><h3>Fotos</h3><div class="pthumbs" id="dphotos"><span class="cl">Fotos werden geladen …</span></div></div>';
-  h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
+  if(!own)h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
   h+='<div class="sec"><h3>Aussehen und Maße</h3><dl class="facts">'+
     fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact(p.geburtsdatum?'Geburtsdatum':'Geburtsjahr',p.geburtsdatum?p.geburtsdatum.split('-').reverse().join('.'):p.geburtsjahr)+
     fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J')+
@@ -794,11 +798,12 @@ function detailHTML(p,confirmDel,ro){
   h+='<div class="sec"><h3>Führerschein</h3>'+chipList(p.fuehrerschein)+'</div>';
   if(p.erfahrung)h+='<div class="sec"><h3>Erfahrung</h3><div class="notes">'+esc(p.erfahrung)+'</div></div>';
   if(linkHTML(p.link))h+='<div class="sec"><h3>Link</h3><div class="notes">'+linkHTML(p.link)+'</div></div>';
-  h+='<div class="sec"><h3>Kontakt und Konditionen</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
-    (hasSch(p)&&p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl><p class="cl" style="margin:4px 0 0">Die Gage kann mit jedem Projekt neu verhandelt werden.</p>':'')+
+  h+='<div class="sec"><h3>'+(own?'Kontakt':'Kontakt und Konditionen')+'</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
+    (!own&&hasSch(p)&&p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl><p class="cl" style="margin:4px 0 0">Die Gage kann mit jedem Projekt neu verhandelt werden.</p>':'')+
     (!p.telefon&&!p.email&&!p.instagram&&!p.social&&!(hasSch(p)&&p.gage!=null&&p.gage!=='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
-  if(p.notizen)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(p.notizen)+'</div></div>';
+  if(p.notizen&&!own)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(p.notizen)+'</div></div>';
   h+='<div class="sec"><h3>Datenschutz</h3>'+(p.einwilligung?'<span class="cl">Einwilligung zur Speicherung liegt vor'+(p.einwilligungDatum?' (seit '+esc(p.einwilligungDatum)+')':'')+'.</span>':'<span class="warn">Einwilligung zur Speicherung fehlt. Hole sie ein, bevor du das Profil weitergibst.</span>')+'</div>';
+  if(own){h+='<div class="acts"><button type="button" class="btn primary" data-act="gotoedit">Profil bearbeiten</button></div>';return h}
   if(ro){
     var pr0=curProj(),st0=pr0?effSt(pr0,p.id):null;
     h+=(st0?'<p style="margin:14px 0 0">'+statTag(st0)+'</p>':'')+'<div class="acts"><button type="button" class="btn" data-act="selbtn" data-id="'+esc(p.id)+'">'+(st0?(st0==='auswahl'?'Aus Auswahl entfernen':'In der Auswahl'):'Auswahl')+'</button><button type="button" class="btn primary" data-act="buchen" data-id="'+esc(p.id)+'"'+(st0==='gebucht'?' disabled':'')+'>'+(st0==='gebucht'?'Gebucht':'Buchen')+'</button><button type="button" class="btn" data-act="close">Schließen</button></div>';
@@ -833,7 +838,7 @@ function formHTML(p,self){
     inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+
     inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+inp('f-plz','Postleitzahl'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
     '</div>'+typBlock(p,self)+
-    '<div class="fld" style="margin-top:12px"><div class="fl">Fotos'+(self?' * <span class="hint">mindestens eins</span>':'')+'</div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
+    '<div class="fld" style="margin-top:12px"><div class="fl">Fotos'+(self?' *':'')+'</div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
   h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
     inp('f-groesse','Größe (cm)',p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
     sel('f-konfektion','Konfektionsgröße',KONF,p.konfektion)+inp('f-schuh','Schuhgröße (EU)',p.schuh,'inputmode="decimal"')+
@@ -992,6 +997,7 @@ document.addEventListener('click',function(e){
   else if(act==='kdec'){kDecide(t.dataset.key,t.dataset.s)}
   else if(act==='kzoom'){kZoom(t.dataset.key)}
   else if(act==='close'){closeSheet()}
+  else if(act==='gotoedit'){setView('edit');window.scrollTo(0,0)}
   else if(act==='zoom'){openGallery(0)}
   else if(act==='gal'){openGallery(parseInt(t.dataset.i,10)||0)}
   else if(act==='lbprev'){showGal(state.galIdx-1)}
@@ -1146,6 +1152,31 @@ function startDetail(p){
   });
 }
 
+function startOwnView(p){
+  state.gallery=[];
+  if(!p.hasFoto)return;
+  loadPhotos(p).then(function(map){
+    state.gallery=ALLSLOTS.filter(function(s){return map[s.k]}).map(function(s){return {label:s.l,thumb:map[s.k].thumb,src:map[s.k].data||map[s.k].thumb}});
+    var el=$('#dphotos');
+    if(el)el.innerHTML=state.gallery.length?state.gallery.map(function(g,i){
+      return '<button type="button" class="pth" data-act="gal" data-i="'+i+'" aria-label="'+esc(g.label)+' vergrößern"><div class="ph"><img alt="" src="'+esc(g.thumb||g.src)+'"></div><span>'+esc(g.label)+'</span></button>';
+    }).join(''):'<span class="cl">Keine Fotos gefunden.</span>';
+  });
+}
+async function renderSelfView(){
+  var host=$('#v-self');
+  $('#count').textContent='Dein Profil';
+  if(!db||state.nodb){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2><p class="cl">Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';return}
+  if(!uid){host.innerHTML='<div class="selfwrap"><h2>Bitte anmelden</h2></div>';return}
+  host.innerHTML='<div class="selfwrap"><p class="cl">Dein Profil wird geladen …</p></div>';
+  var p=null;
+  try{var sn=await db.doc('people/'+uid).get();if(sn.exists)p=Object.assign({},sn.data()||{},{id:uid})}catch(e){}
+  if(state.view!=='self')return;
+  if(!p){setView('edit');return}
+  host.innerHTML='<div class="selfwrap">'+detailHTML(p,false,false,true)+'</div>';
+  startOwnView(p);
+}
+
 /* ---------- Kalender ---------- */
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function todayStr(){return ymd(new Date())}
@@ -1248,13 +1279,13 @@ async function removeExamples(){
 
 /* ---------- Masken ---------- */
 function fmtDMY(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)}
-function tabsFor(r){return r==='admin'?['kartei','proj','pruef']:r==='kunde'?['kunde']:['self','buch']}
+function tabsFor(r){return r==='admin'?['kartei','proj','pruef']:r==='kunde'?['kunde']:['self','edit','buch']}
 function setView(v){
   var tabs=tabsFor(role);
   if(tabs.indexOf(v)<0)v=tabs[0];
   flushCal();
   state.view=v;
-  ['kartei','proj','self','kunde','buch','pruef'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
+  ['kartei','proj','self','edit','kunde','buch','pruef'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
   Array.prototype.forEach.call(document.querySelectorAll('#nav .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));b.hidden=tabs.indexOf(b.dataset.v)<0});
   $('#nav').hidden=tabs.length<2;
   $('#topact').hidden=!(isAdmin&&v==='kartei');
@@ -1263,7 +1294,8 @@ function setView(v){
   else if(v==='kunde')renderKunde();
   else if(v==='buch')renderBuch();
   else if(v==='pruef')renderPruef();
-  else renderSelf();
+  else if(v==='edit')renderSelf();
+  else renderSelfView();
 }
 function calEndStr(){var e=weekStart(new Date());e.setDate(e.getDate()+WEEKS*7-1);return ymd(e)}
 
@@ -1306,14 +1338,14 @@ async function setUser(id,act){
 
 /* ---------- Mein Profil ---------- */
 async function renderSelf(note){
-  var host=$('#v-self');
-  $('#count').textContent='Dein Profil für die Agentur';
+  var host=$('#v-edit');
+  $('#count').textContent='Profil bearbeiten';
   if(!db||state.nodb){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2><p class="cl">Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';return}
   if(!uid){host.innerHTML='<div class="selfwrap"><h2>Bitte anmelden</h2><p class="cl">Bitte melde dich an.</p></div>';return}
   host.innerHTML='<div class="selfwrap"><p class="cl">Dein Profil wird geladen …</p></div>';
   var p=null;
   try{var sn=await db.doc('people/'+uid).get();if(sn.exists)p=Object.assign({},sn.data()||{},{id:uid})}catch(e){}
-  if(state.view!=='self')return;
+  if(state.view!=='edit')return;
   state.selfP=p;resetPhotoState();
   state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
   var rg=ctx.reg||{},pre={einwilligung:!!rg.einwilligung,email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
