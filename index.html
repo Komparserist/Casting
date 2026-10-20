@@ -223,6 +223,9 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .foot a{color:inherit}
 .demo{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 
+.hint{border:1px solid var(--accent);background:var(--chip);border-radius:10px;padding:12px 14px}
+.hint p{margin:0}
+
 </style>
 </head>
 <body>
@@ -967,6 +970,8 @@ document.addEventListener('click',function(e){
   else if(act==='clear'){state.f=newFilters();state.q='';$('#q').value='';refreshPanel(true);renderList()}
   else if(act==='open'){var p=findP(id);if(p){var ro=!!t.closest('#v-proj');openSheet(detailHTML(p,false,ro));startDetail(p)}}
   else if(act==='avail'){var ap=findP(id),sec=$('#availsec');if(ap&&sec&&state.cal){sec.innerHTML='<h3>Verfügbarkeit ändern</h3>'+calHTML(ap,true);sec.scrollIntoView({block:'start'});t.hidden=true}}
+  else if(act==='khok'){state.kHintHide=true;renderKunde()}
+  else if(act==='khnever'){state.kHintHide=true;try{localStorage.setItem(kHintKey(),'1')}catch(e){}renderKunde()}
   else if(act==='ptab'){state.ptab=t.dataset.v;fillPList()}
   else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
   else if(act==='pback'){state.pOpen=false;state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
@@ -1303,7 +1308,7 @@ async function renderSelf(note){
   if(state.view!=='self')return;
   state.selfP=p;resetPhotoState();
   state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
-  var rg=ctx.reg||{},pre={email:myEmail,vorname:(myName||'').split(' ')[0]||'',nachname:(myName||'').split(' ').slice(1).join(' ')||''};
+  var rg=ctx.reg||{},pre={email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
   if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
   state.selfBase=p||pre;
   var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':p&&p.freigabe==='ok'?'<p class="okmsg" role="status">Dein Profil ist freigegeben.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>';
@@ -1405,6 +1410,13 @@ function availFor(p,days){
   var rel=days.filter(function(d){return d>=t}),inw=rel.filter(function(d){return d<=end});
   var free=inw.filter(function(d){return set.has(d)}).length;
   return {rel:rel.length,inw:inw.length,free:free,out:rel.length-inw.length};
+}
+var KHINT_TXT='Lege ein Projekt mit Drehtagen und gesuchten Rollen an. Die Agentur schlägt dir passende, verfügbare Darsteller vor. Du bestätigst oder lehnst jedes Profil ab. Bestätigte Profile werden von der Agentur gebucht.';
+function kHintKey(){return 'casting-hint-'+uid}
+function kHintOff(){try{return state.kHintHide||localStorage.getItem(kHintKey())==='1'}catch(e){return !!state.kHintHide}}
+function kHint(){
+  if(kHintOff())return '';
+  return '<div class="selfwrap" style="padding-top:0"><div class="hint" role="note"><p>'+esc(KHINT_TXT)+'</p><div class="acts" style="border:0;padding:0;margin-top:10px"><button type="button" class="btn primary" data-act="khok">OK</button><button type="button" class="btn" data-act="khnever">Nicht nochmal anzeigen</button></div></div></div>';
 }
 /* ---------- Projekte: Liste mit Reitern, Suche, Sortierung, Firmenfilter ---------- */
 var PTABS=[['neu','Neue Projekte'],['mit','Mit Auswahl'],['voll','Ausgebucht'],['abg','Abgeschlossen']];
@@ -1724,7 +1736,7 @@ async function renderKunde(){
   try{var qs=await db.collection('kunden/'+uid+'/auswahl').get();docs=qs.docs.map(function(d){return Object.assign({},d.data()||{},{key:d.id})})}catch(e){}
   if(state.view!=='kunde')return;
   state.kdocs={};docs.forEach(function(d){state.kdocs[d.key]=d});
-  var h='<div class="selfwrap"><h2 style="font-size:30px">Deine Projekte</h2><p class="intro" style="margin-top:6px">Lege ein Projekt mit Drehtagen und gesuchten Rollen an. Die Agentur schlägt dir passende, verfügbare Darsteller vor. Du bestätigst oder lehnst jedes Profil ab. Kontaktdaten der Personen bekommst du nicht.</p><div class="acts" style="border:0;padding:0;margin-top:12px"><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div></div>';
+  var h='<div class="selfwrap"><h2 style="font-size:30px">Deine Projekte</h2></div>'+kHint()+'<div class="selfwrap" style="padding-top:0"><div class="acts" style="border:0;padding:0;margin-top:12px"><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div></div>';
   var list=state.projects.slice().sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
   if(!list.length)h+='<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Tippe auf „Neues Projekt“, um zu beginnen.</p></div>';
   list.forEach(function(pr){
@@ -1906,9 +1918,11 @@ async function renderAuth(msg, ok) {
     h += '<form id="aform" novalidate>';
     if (step2) {
       if (!prod) h += '<p class="cl" style="margin:0 0 12px">Registrierung als <b>' + esc(KAT[reg.kat] || '') + '</b>' + (reg.kat === 'kd' ? ' (' + [reg.tages ? 'Tagesrollen' : '', reg.text ? 'Textrollen' : ''].filter(Boolean).join(', ') + ')' : reg.kat === 'schauspieler' && (reg.komp || reg.kdopt) ? ' (auch für ' + [reg.komp ? 'Komparsenrollen' : '', reg.kdopt ? 'Kleindarstellerrollen' : ''].filter(Boolean).join(' und ') + ')' : '') + ' <button type="button" class="btn small" data-m="register">Ändern</button></p>';
-      h += '<div class="fld"><label for="a-name">' + (prod ? 'Name der Ansprechperson' : 'Name') + '</label><input id="a-name" autocomplete="name"></div>';
+      h += prod
+        ? '<div class="fld"><label for="a-name">Name der Ansprechperson</label><input id="a-name" autocomplete="name"></div>'
+        : '<div class="fld"><label for="a-vn">Vorname</label><input id="a-vn" autocomplete="given-name"></div><div class="fld"><label for="a-nn">Nachname</label><input id="a-nn" autocomplete="family-name"></div>';
     }
-    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>';
+    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>' + (step2 ? '<div class="fld"><label for="a-pw2">Passwort wiederholen</label><input id="a-pw2" type="password" autocomplete="new-password"></div>' : '');
     h += '<div class="ferr" id="aerr" role="alert">' + (ok ? '' : esc(msg || '')) + '</div>' + (ok ? '<div class="okmsg" role="status">' + esc(msg) + '</div>' : '');
     h += '<div class="acts" style="margin-top:6px;border:0;padding:0"><button type="submit" class="btn primary" id="abtn">' + (step2 ? 'Konto anlegen' : 'Anmelden') + '</button>' + (step2 ? '' : '<button type="button" class="btn" id="areset">Passwort vergessen</button>') + '</div></form>';
   }
@@ -1957,9 +1971,13 @@ document.addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     if (mode !== 'login') {
-      const name = $('#a-name').value.trim();
-      if (!name) { err.textContent = 'Trage deinen Namen ein.'; btn.disabled = false; return; }
-      await be.register(mail, pw, name, prod ? 'kunde' : 'bewerber', prod ? null : buildReg());
+      let name, vn = '', nn = '';
+      if (prod) name = $('#a-name').value.trim();
+      else { vn = $('#a-vn').value.trim(); nn = $('#a-nn').value.trim(); name = (vn + ' ' + nn).trim(); }
+      if (prod ? !name : !vn || !nn) { err.textContent = prod ? 'Trage den Namen der Ansprechperson ein.' : 'Trage Vorname und Nachname ein.'; btn.disabled = false; return; }
+      if (pw !== $('#a-pw2').value) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; btn.disabled = false; return; }
+      const rg = prod ? null : Object.assign(buildReg(), { vorname: vn, nachname: nn });
+      await be.register(mail, pw, name, prod ? 'kunde' : 'bewerber', rg);
       if (be.mode === 'local') location.reload();
     } else {
       await be.signIn(mail, pw);
