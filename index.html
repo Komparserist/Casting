@@ -529,7 +529,14 @@ var db=ctx.db,canWrite=true,role=ctx.role,isAdmin=ctx.role==='admin',uid=ctx.uid
 function $(s,r){return (r||document).querySelector(s)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function num(v){if(v===''||v==null)return null;var n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null}
-function ageOf(p){return p.geburtsjahr?YEAR-p.geburtsjahr:null}
+function ageOf(p){
+  if(p.geburtsdatum&&/^\d{4}-\d{2}-\d{2}$/.test(p.geburtsdatum)){
+    var b=p.geburtsdatum.split('-').map(Number),n=new Date(),a=n.getFullYear()-b[0];
+    if(n.getMonth()+1<b[1]||(n.getMonth()+1===b[1]&&n.getDate()<b[2]))a--;
+    return a;
+  }
+  return p.geburtsjahr?YEAR-p.geburtsjahr:null;
+}
 var AGENTUR_MAIL='';
 function profOK(p){return !p.freigabe||p.freigabe==='ok'}
 function hasSch(p){return (p.typ||[]).indexOf('Schauspieler')>=0}
@@ -710,7 +717,7 @@ function panelHTML(){
   });
   h+='<div class="fr"><label>Spielalter <span class="u">Jahre</span></label><input inputmode="numeric" data-spiel="1" placeholder="z. B. 35" value="'+esc(f.spiel)+'"></div><div class="fr"><label>Postleitzahl <span class="u">beginnt mit</span></label><input inputmode="numeric" maxlength="5" data-plz="1" placeholder="z. B. 90" value="'+esc(f.plz)+'"></div><div class="fr"><label>Verfügbar von</label><input type="date" data-dfrom="1" value="'+esc(f.dFrom)+'"></div><div class="fr"><label>Verfügbar bis <span class="u">optional</span></label><input type="date" data-dto="1" value="'+esc(f.dTo)+'"></div></div>';
   GROUPS.forEach(function(g){
-    h+='<div class="fg"><div class="fl">'+g.label+(g.multi?' <span class="hint">alle gewählten müssen passen</span>':'')+'</div><div class="chips">';
+    h+='<div class="fg"><div class="fl">'+g.label+'</div><div class="chips">';
     optsFor(g).forEach(function(o){
       var on=f.sets[g.k].has(o);
       h+='<button type="button" class="chip'+(on?' on':'')+'" aria-pressed="'+on+'" data-act="chip" data-g="'+g.k+'" data-v="'+esc(o)+'">'+esc(o)+'</button>';
@@ -770,13 +777,13 @@ function detailHTML(p,confirmDel,ro){
   h+='</div>';
   if(p.freigabe==='neu'||p.freigabe==='abgelehnt')h+='<p class="warn" style="margin:8px 0 0">'+(p.freigabe==='neu'?'Neues Profil, noch nicht freigegeben. Es wird erst nach der Freigabe für Projekte vorgeschlagen.':'Profil abgelehnt. Es wird nicht für Projekte vorgeschlagen.')+'</p>';
   if(hasSch(p)&&!schOK(p))h+='<p class="warn" style="margin:8px 0 0">Schauspieler-Nachweis noch offen'+(p.ausbildung?' (Schauspielausbildung angegeben)':'')+'. Wird nur als Komparse vorgeschlagen, falls auch Komparse gewählt ist.</p>';
-  if(p.ort||p.plz)h+='<p class="cl" style="margin:8px 0 0">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</p>';
+  if(p.ort||p.plz||p.strasse)h+='<p class="cl" style="margin:8px 0 0">'+esc([p.strasse||'',((p.plz||'')+' '+(p.ort||'')).trim()].filter(Boolean).join(', '))+'</p>';
   if(p.agentur)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
   h+='</div></div>';
   if(p.hasFoto)h+='<div class="sec"><h3>Fotos</h3><div class="pthumbs" id="dphotos"><span class="cl">Fotos werden geladen …</span></div></div>';
   h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
   h+='<div class="sec"><h3>Aussehen und Maße</h3><dl class="facts">'+
-    fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact('Geburtsjahr',p.geburtsjahr)+
+    fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact(p.geburtsdatum?'Geburtsdatum':'Geburtsjahr',p.geburtsdatum?p.geburtsdatum.split('-').reverse().join('.'):p.geburtsjahr)+
     fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J')+
     fact('Größe',p.groesse,'cm')+fact('Gewicht',p.gewicht,'kg')+fact('Konfektion',p.konfektion)+fact('Schuhgröße',p.schuh)+
     fact('Haarfarbe',p.haarfarbe)+fact('Haarlänge',p.haarlaenge)+fact('Augenfarbe',p.augenfarbe)+fact('Bart',p.bart)+
@@ -820,13 +827,13 @@ function formHTML(p,self){
   var gFs=GROUPS.filter(function(g){return g.k==='fuehrerschein'})[0];
   var h='<form id="form" novalidate'+(self?' data-self="1"':'')+'>'+(self?'':'<div class="sh"><h2 id="sheetTitle">'+(isNew?'Neues Profil':'Profil bearbeiten')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>');
   h+='<fieldset><legend>Person</legend><div class="cols">'+
-    inp('f-vorname','Vorname',p.vorname,'autocomplete="off" data-first')+inp('f-nachname','Nachname',p.nachname,'autocomplete="off"')+
-    sel('f-geschlecht','Geschlecht',GESCHLECHT,p.geschlecht)+
-    inp('f-geburtsjahr','Geburtsjahr',p.geburtsjahr,'inputmode="numeric" placeholder="z. B. 1988"')+
+    inp('f-vorname','Vorname'+(self?' *':''),p.vorname,'autocomplete="off" data-first')+inp('f-nachname','Nachname'+(self?' *':''),p.nachname,'autocomplete="off"')+
+    sel('f-geschlecht','Geschlecht'+(self?' *':''),GESCHLECHT,p.geschlecht)+
+    '<div class="fld"><label for="f-geburtsdatum">Geburtsdatum'+(self?' *':'')+'</label><input id="f-geburtsdatum" type="date" min="1900-01-01" max="'+todayStr()+'" value="'+esc(p.geburtsdatum||'')+'" data-jahr="'+esc(p.geburtsjahr||'')+'" autocomplete="bday"></div>'+
     inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+
-    inp('f-plz','Postleitzahl',p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort',p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
+    inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+inp('f-plz','Postleitzahl'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
     '</div>'+typBlock(p,self)+
-    '<div class="fld" style="margin-top:12px"><div class="fl">Fotos <span class="hint">Portrait, Ganzkörper und Profilansicht, dazu bis zu 5 weitere</span></div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
+    '<div class="fld" style="margin-top:12px"><div class="fl">Fotos'+(self?' * <span class="hint">mindestens eins</span>':'')+'</div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
   h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
     inp('f-groesse','Größe (cm)',p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
     sel('f-konfektion','Konfektionsgröße',KONF,p.konfektion)+inp('f-schuh','Schuhgröße (EU)',p.schuh,'inputmode="decimal"')+
@@ -845,11 +852,12 @@ function formHTML(p,self){
     '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div>'+
     '<div class="fld" style="margin-top:12px"><label for="f-link">Link zu Vorstellungsvideo, Homepage oder externem Profil</label><input id="f-link" type="text" inputmode="url" autocomplete="off" placeholder="z. B. vimeo.com/… oder meine-seite.de" value="'+esc(p.link||'')+'"></div></fieldset>';
   h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
-    inp('f-telefon','Telefon',p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',p.email,'type="text" inputmode="email" autocomplete="off"')+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
+    inp('f-telefon','Telefon'+(self?' *':''),p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',self?(myEmail||p.email):p.email,'type="text" inputmode="email" autocomplete="off"'+(self?' readonly':''))+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
     (self?'':'<div id="gagefld"'+(hasSch(p)?'':' hidden')+'>'+inp('f-gage','Tagesgage (€), nur Schauspieler',p.gage,'inputmode="decimal"')+'<p class="cl" style="margin:4px 0 0">Nur intern. Die Gage kann mit jedem Projekt neu verhandelt werden.</p></div>')+'</div>'+
     (self?'<p class="cl" style="margin:8px 0 0">Deine Kontaktdaten sieht nur die Agentur.</p>':'<div class="fld" style="margin-top:12px"><label for="f-notizen">Notizen</label><textarea id="f-notizen">'+esc(p.notizen)+'</textarea></div>')+'</fieldset>';
   if(self)h+='<fieldset><legend>Wann hast du Zeit?</legend>'+calHTML(p,true)+'</fieldset>';
-  h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
+  if(self&&p.einwilligung)h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw" checked disabled><span>Eingewilligt bei der Registrierung: Die Agentur speichert meine Daten und Fotos und nutzt sie zur Vermittlung an Produktionen (DSGVO).'+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
+  else h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
   h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="saveBtn" data-id="'+esc(p.id||'')+'">'+(self?'Profil speichern':'Speichern')+'</button>'+(self?(p.id?'<button type="button" class="btn danger" data-act="selfdel">'+(state.confirmSelf?'Wirklich löschen':'Mein Profil löschen')+'</button>':''):'<button type="button" class="btn" data-act="close">Abbrechen</button>')+'</div></form>';
   return h;
 }
@@ -883,8 +891,8 @@ function oldF(){return state.selfBase||{}}
 function readForm(self){
   var d={
     vorname:val('f-vorname'),nachname:val('f-nachname'),geschlecht:val('f-geschlecht'),
-    geburtsjahr:num(val('f-geburtsjahr')),spielVon:num(val('f-spielvon')),spielBis:num(val('f-spielbis')),
-    plz:val('f-plz'),ort:val('f-ort'),agentur:val('f-agentur'),typ:checked('typ'),
+    geburtsdatum:val('f-geburtsdatum'),geburtsjahr:/^\d{4}-/.test(val('f-geburtsdatum'))?num(val('f-geburtsdatum').slice(0,4)):num(($('#f-geburtsdatum')||{dataset:{}}).dataset.jahr||''),spielVon:num(val('f-spielvon')),spielBis:num(val('f-spielbis')),
+    strasse:val('f-strasse'),plz:val('f-plz'),ort:val('f-ort'),agentur:val('f-agentur'),typ:checked('typ'),
     groesse:num(val('f-groesse')),gewicht:num(val('f-gewicht')),konfektion:val('f-konfektion'),schuh:num(val('f-schuh')),
     haarfarbe:val('f-haarfarbe'),haarlaenge:val('f-haarlaenge'),augenfarbe:val('f-augenfarbe'),bart:val('f-bart'),tattoos:val('f-tattoos'),
     brille:$('#f-brille').checked,sprechrollen:$('#f-sprech')?$('#f-sprech').checked:!!(oldF().sprechrollen),tagesrollen:$('#f-tages')?$('#f-tages').checked:!!(oldF().tagesrollen),link:safeUrl(val('f-link')),
@@ -932,7 +940,7 @@ async function save(id){
   var err=$('#ferr'),btn=$('#saveBtn');
   var d=readForm();
   if(!d.vorname&&!d.nachname){err.textContent='Trage mindestens einen Vor- oder Nachnamen ein.';$('#f-vorname').focus();return}
-  if(d.geburtsjahr!=null&&(d.geburtsjahr<1900||d.geburtsjahr>YEAR)){err.textContent='Das Geburtsjahr muss zwischen 1900 und '+YEAR+' liegen.';$('#f-geburtsjahr').focus();return}
+  if(d.geburtsdatum&&(d.geburtsdatum<'1900-01-01'||d.geburtsdatum>todayStr())){err.textContent='Das Geburtsdatum liegt nicht im gültigen Bereich.';$('#f-geburtsdatum').focus();return}
   if(!d.typ.length&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle mindestens eine Kategorie: Schauspieler oder Komparse, oder gib Erfahrung mit Sprech- oder Tagesrollen an.';return}
   err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
   try{
@@ -1308,7 +1316,7 @@ async function renderSelf(note){
   if(state.view!=='self')return;
   state.selfP=p;resetPhotoState();
   state.cal={id:uid,set:new Set(((p&&p.verfDates)||[]).filter(function(x){return x>=todayStr()})),timer:null,busy:false,dirty:false,noAuto:true};
-  var rg=ctx.reg||{},pre={email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
+  var rg=ctx.reg||{},pre={einwilligung:!!rg.einwilligung,email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
   if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
   state.selfBase=p||pre;
   var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':p&&p.freigabe==='ok'?'<p class="okmsg" role="status">Dein Profil ist freigegeben.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>';
@@ -1319,11 +1327,13 @@ async function saveSelf(){
   var err=$('#ferr'),btn=$('#saveBtn');
   var d=readForm(true);
   if(!d.vorname&&!d.nachname){err.textContent='Trage deinen Namen ein.';$('#f-vorname').focus();return}
-  if(d.geburtsjahr!=null&&(d.geburtsjahr<1900||d.geburtsjahr>YEAR)){err.textContent='Das Geburtsjahr muss zwischen 1900 und '+YEAR+' liegen.';$('#f-geburtsjahr').focus();return}
+  var must=[['vorname','f-vorname','den Vornamen'],['nachname','f-nachname','den Nachnamen'],['strasse','f-strasse','Straße und Hausnummer'],['plz','f-plz','die Postleitzahl'],['ort','f-ort','den Wohnort'],['geburtsdatum','f-geburtsdatum','das Geburtsdatum'],['geschlecht','f-geschlecht','das Geschlecht'],['telefon','f-telefon','die Telefonnummer']];
+  for(var mi=0;mi<must.length;mi++){if(!d[must[mi][0]]){err.textContent='Bitte trage '+must[mi][2]+' ein. Pflichtfelder sind mit * markiert.';var me=$('#'+must[mi][1]);if(me)me.focus();return}}
+  if(d.geburtsdatum<'1900-01-01'||d.geburtsdatum>todayStr()){err.textContent='Das Geburtsdatum liegt nicht im gültigen Bereich.';$('#f-geburtsdatum').focus();return}
   if(!d.typ.length&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle Schauspieler oder Komparse, oder gib Erfahrung mit Text- oder Tagesrollen an.';return}
   if(baseKat(oldF())==='kd'&&!d.sprechrollen&&!d.tagesrollen){err.textContent='Wähle mindestens eine Erfahrung aus: Tagesrollen oder Textrollen.';return}
-  if(!d.telefon&&!d.email){err.textContent='Trage Telefon oder E-Mail ein, damit dich die Agentur erreichen kann.';$('#f-telefon').focus();return}
   if(!d.einwilligung){err.textContent='Ohne deine Einwilligung darf das Profil nicht gespeichert werden.';return}
+  d.email=myEmail||d.email;
   if(!uid){err.textContent='Du bist nicht angemeldet.';return}
   err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
   try{
@@ -1340,6 +1350,9 @@ async function saveSelf(){
     var cs=state.cal&&state.cal.set?state.cal.set:new Set(),t=todayStr();
     rec.verfDates=Array.from(cs).filter(function(x){return x>=t}).sort();
     if(state.photoLoad){try{await state.photoLoad}catch(e){}}
+    var hasPh=ALLSLOTS.some(function(sl){var ed=state.photoEdits[sl.k];return ed?!!ed.full:!!state.photoDocs[sl.k]});
+    if(!hasPh&&old&&old.hasFoto&&!Object.keys(state.photoDocs).length&&!Object.keys(state.photoEdits).some(function(x){return state.photoEdits[x].remove}))hasPh=true;
+    if(!hasPh){btn.disabled=false;btn.textContent='Profil speichern';err.textContent='Bitte lade mindestens ein Foto hoch.';return}
     await persistPhotos(uid,old,rec);
     await ref.set(rec);
     state.confirmSelf=false;
@@ -1922,7 +1935,7 @@ async function renderAuth(msg, ok) {
         ? '<div class="fld"><label for="a-name">Name der Ansprechperson</label><input id="a-name" autocomplete="name"></div>'
         : '<div class="fld"><label for="a-vn">Vorname</label><input id="a-vn" autocomplete="given-name"></div><div class="fld"><label for="a-nn">Nachname</label><input id="a-nn" autocomplete="family-name"></div>';
     }
-    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>' + (step2 ? '<div class="fld"><label for="a-pw2">Passwort wiederholen</label><input id="a-pw2" type="password" autocomplete="new-password"></div>' : '');
+    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>' + (step2 ? '<div class="fld"><label for="a-pw2">Passwort wiederholen</label><input id="a-pw2" type="password" autocomplete="new-password"></div>' : '') + (step2 && !prod ? '<label class="consent" style="margin-top:12px"><input type="checkbox" id="a-einw"><span>Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann mein Profil jederzeit ändern oder löschen.</span></label>' : '');
     h += '<div class="ferr" id="aerr" role="alert">' + (ok ? '' : esc(msg || '')) + '</div>' + (ok ? '<div class="okmsg" role="status">' + esc(msg) + '</div>' : '');
     h += '<div class="acts" style="margin-top:6px;border:0;padding:0"><button type="submit" class="btn primary" id="abtn">' + (step2 ? 'Konto anlegen' : 'Anmelden') + '</button>' + (step2 ? '' : '<button type="button" class="btn" id="areset">Passwort vergessen</button>') + '</div></form>';
   }
@@ -1975,8 +1988,9 @@ document.addEventListener('submit', async (e) => {
       if (prod) name = $('#a-name').value.trim();
       else { vn = $('#a-vn').value.trim(); nn = $('#a-nn').value.trim(); name = (vn + ' ' + nn).trim(); }
       if (prod ? !name : !vn || !nn) { err.textContent = prod ? 'Trage den Namen der Ansprechperson ein.' : 'Trage Vorname und Nachname ein.'; btn.disabled = false; return; }
+      if (!prod && !($('#a-einw') || {}).checked) { err.textContent = 'Ohne deine Einwilligung zur Datenverarbeitung können wir dich nicht eintragen.'; btn.disabled = false; return; }
       if (pw !== $('#a-pw2').value) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; btn.disabled = false; return; }
-      const rg = prod ? null : Object.assign(buildReg(), { vorname: vn, nachname: nn });
+      const rg = prod ? null : Object.assign(buildReg(), { vorname: vn, nachname: nn, einwilligung: true });
       await be.register(mail, pw, name, prod ? 'kunde' : 'bewerber', rg);
       if (be.mode === 'local') location.reload();
     } else {
