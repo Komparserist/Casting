@@ -226,6 +226,8 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .hint{border:1px solid var(--accent);background:var(--chip);border-radius:10px;padding:12px 14px}
 .hint p{margin:0}
 
+.plzrow{display:grid;grid-template-columns:110px 1fr;gap:12px;margin-top:12px}
+
 </style>
 </head>
 <body>
@@ -788,7 +790,7 @@ function detailHTML(p,confirmDel,ro,own){
   if(!own)h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
   h+='<div class="sec"><h3>Aussehen und Maße</h3><dl class="facts">'+
     fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact(p.geburtsdatum?'Geburtsdatum':'Geburtsjahr',p.geburtsdatum?p.geburtsdatum.split('-').reverse().join('.'):p.geburtsjahr)+
-    fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J')+
+    (hasSch(p)?fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J'):'')+
     fact('Größe',p.groesse,'cm')+fact('Gewicht',p.gewicht,'kg')+fact('Konfektion',p.konfektion)+fact('Schuhgröße',p.schuh)+
     fact('Haarfarbe',p.haarfarbe)+fact('Haarlänge',p.haarlaenge)+fact('Augenfarbe',p.augenfarbe)+fact('Bart',p.bart)+
     fact('Tattoos',p.tattoos)+fact('Brille',p.brille?'ja':'')+'</dl></div>';
@@ -835,9 +837,8 @@ function formHTML(p,self){
     inp('f-vorname','Vorname'+(self?' *':''),p.vorname,'autocomplete="off" data-first')+inp('f-nachname','Nachname'+(self?' *':''),p.nachname,'autocomplete="off"')+
     sel('f-geschlecht','Geschlecht'+(self?' *':''),GESCHLECHT,p.geschlecht)+
     '<div class="fld"><label for="f-geburtsdatum">Geburtsdatum'+(self?' *':'')+'</label><input id="f-geburtsdatum" type="date" min="1900-01-01" max="'+todayStr()+'" value="'+esc(p.geburtsdatum||'')+'" data-jahr="'+esc(p.geburtsjahr||'')+'" autocomplete="bday"></div>'+
-    inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+
-    inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+inp('f-plz','Postleitzahl'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off"')+(self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
-    '</div>'+typBlock(p,self)+
+    (self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
+    '</div><div style="margin-top:12px">'+inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+'</div><div class="plzrow">'+inp('f-plz','PLZ'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off"')+'</div>'+typBlock(p,self)+
     '<div class="fld" style="margin-top:12px"><div class="fl">Fotos'+(self?' *':'')+'</div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
   h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
     inp('f-groesse','Größe (cm)',p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
@@ -845,6 +846,7 @@ function formHTML(p,self){
     sel('f-haarfarbe','Haarfarbe',HAARFARBE,p.haarfarbe)+sel('f-haarlaenge','Haarlänge',HAARLAENGE,p.haarlaenge)+
     sel('f-augenfarbe','Augenfarbe',AUGEN,p.augenfarbe)+sel('f-bart','Bart',BART,p.bart)+
     sel('f-tattoos','Tattoos',TATTOOS,p.tattoos)+
+    '<div id="spielfld" class="cols" style="grid-column:1/-1"'+(hasSch(p)?'':' hidden')+'>'+inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+'</div>'+
     '</div><label class="consent" style="margin-top:12px"><input type="checkbox" id="f-brille"'+(p.brille?' checked':'')+'><span>Trägt eine Brille</span></label></fieldset>';
   h+='<fieldset><legend>Können</legend>'+
     '<div class="fld"><div class="fl">Sprachen</div>'+checks('sprachen',optsFor(gSp),p.sprachen||[])+'</div>'+
@@ -908,12 +910,13 @@ function readForm(self){
   };
   if(self){
     delete d.agentur;delete d.gage;delete d.notizen;
+    if(baseKat(oldF())!=='sch'){d.spielVon=null;d.spielBis=null}
     var kt=baseKat(oldF());
     if(kt==='sch')d.typ=['Schauspieler'].concat(checked('typ'));else if(kt==='komp')d.typ=['Komparse'];else if(kt==='kd')d.typ=['Kleindarsteller'];
   }
   else{
     var isS=d.typ.indexOf('Schauspieler')>=0,gp=$('#f-geprueft');
-    if(!isS)d.gage=null;
+    if(!isS){d.gage=null;d.spielVon=null;d.spielBis=null}
     d.schauspielerStatus=isS&&gp?(gp.checked?'geprueft':'offen'):'';
   }
   return d;
@@ -1059,7 +1062,7 @@ document.addEventListener('change',function(e){
   if(t.id==='psort'){state.psort=t.value;fillPList();return}
   if(t.name==='typ'&&t.closest&&t.closest('#form')){
     var sch=!!document.querySelector('#form input[name="typ"][value="Schauspieler"]:checked');
-    ['schnote','gepwrap','gagefld','kdchip'].forEach(function(i){var el=$('#'+i);if(el)el.hidden=!sch});
+    ['schnote','gepwrap','gagefld','kdchip','spielfld'].forEach(function(i){var el=$('#'+i);if(el)el.hidden=!sch});
     var kc=$('#kompchip span');if(kc&&$('#kdchip'))kc.textContent=sch?'Auch für Komparsenrollen berücksichtigen':'Komparse';
     if(t.value==='Schauspieler'&&$('#kdchip')){var kb=$('#kdchip input');if(kb)kb.checked=sch}
     return;
@@ -2055,6 +2058,22 @@ async function boot() {
 }
 boot();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+/* Großschreibung mit CSS macht aus ß ein SS (Maße wird MASSE). In den Großbuchstaben-Überschriften nehmen wir stattdessen das große ẞ. */
+(function () {
+  const SEL = 'legend,.fl,.fld label,.fr label,dl.facts dt,.sec h3,.pill,.pl,.sh h2,.role b,.mh,.calt,.top h1,.auth h1';
+  let busy = false;
+  function fix() {
+    busy = false;
+    document.querySelectorAll(SEL).forEach((el) => {
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) { if (n.nodeValue.indexOf('ß') >= 0) n.nodeValue = n.nodeValue.replace(/ß/g, 'ẞ'); }
+    });
+  }
+  new MutationObserver(() => { if (!busy) { busy = true; requestAnimationFrame(fix); } }).observe(document.documentElement, { childList: true, subtree: true });
+  fix();
+})();
 </script>
 </body>
 </html>
