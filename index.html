@@ -989,7 +989,10 @@ document.addEventListener('click',function(e){
   else if(act==='khok'){state.kHintHide=true;renderKunde()}
   else if(act==='khnever'){state.kHintHide=true;try{localStorage.setItem(kHintKey(),'1')}catch(e){}renderKunde()}
   else if(act==='ptab'){state.ptab=t.dataset.v;fillPList()}
-  else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
+  else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0);loadDispo(curProj())}
+  else if(act==='dsend'){sendDispo()}
+  else if(act==='dmail'){mailDispo()}
+  else if(act==='dall'||act==='dnone'){var dp=curProj();if(dp&&state.dDraft){gebuchtIds(dp).forEach(function(i){state.dDraft.sel[i]=(act==='dall')});renderProj()}}
   else if(act==='pback'){state.pOpen=false;state.confirmDelP=false;renderProj();window.scrollTo(0,0)}
   else if(act==='pfreig'||act==='pablehn'||act==='schbest'){setPerson(id,act)}
   else if(act==='ufreig'||act==='uablehn'){setUser(id,act)}
@@ -1049,6 +1052,8 @@ document.addEventListener('input',function(e){
   else if(t.dataset&&t.dataset.pt!=null&&t.dataset.pt!==''&&state.pdraft){state.pdraft.tage[+t.dataset.pt][t.dataset.k]=t.value}
   else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
   else if(t.id==='pq'){state.pq=t.value;fillPList()}
+  else if(t.dataset&&t.dataset.dd&&state.dDraft){state.dDraft[t.dataset.dd]=t.value}
+  else if(t.dataset&&t.dataset.dsel&&state.dDraft){state.dDraft.sel[t.dataset.dsel]=t.checked}
   else if(t.id==='q'){state.q=t.value.trim();renderList()}
   else if(t.dataset&&t.dataset.r){state.f.r[t.dataset.r][t.dataset.b]=t.value.trim();renderList()}
   else if(t.dataset&&t.dataset.spiel){state.f.spiel=t.value.trim();renderList()}
@@ -1155,6 +1160,87 @@ function startDetail(p){
   });
 }
 
+/* ---------- Dispo pro Projekt ---------- */
+function gebuchtIds(pr){var m=pr.auswahl||{};return Object.keys(m).filter(function(id){return m[id].st==='gebucht'&&findP(id)})}
+function dispoDraft(pr){
+  if(!state.dDraft||state.dDraft.pid!==pr.id)state.dDraft={pid:pr.id,betreff:'Dispo: '+(pr.name||'Projekt'),text:'',sel:{}};
+  return state.dDraft;
+}
+function dispoHTML(pr,sel){
+  var ids=gebuchtIds(pr);
+  if(!ids.length)return '';
+  var dd=dispoDraft(pr);
+  ids.sort(function(a,b){var x=findP(a),y=findP(b);return String(x.nachname||'').localeCompare(String(y.nachname||''),'de')||String(x.vorname||'').localeCompare(String(y.vorname||''),'de')});
+  var n=ids.filter(function(i){return dd.sel[i]!==false}).length;
+  var h='<h2 class="mh">Dispo <small>'+ids.length+' gebucht</small></h2><div class="pcard" style="margin-top:6px"><div class="fld"><label for="d-bet">Betreff</label><input id="d-bet" data-dd="betreff" value="'+esc(dd.betreff)+'" autocomplete="off"></div><div class="fld" style="margin-top:10px"><label for="d-txt">Dispo-Text</label><textarea id="d-txt" data-dd="text" rows="8" placeholder="Treffpunkt, Uhrzeit, Kleidung, Ansprechperson am Set …">'+esc(dd.text)+'</textarea></div>'+
+    '<div class="fl" style="margin-top:12px">Empfänger</div><div class="pbar" style="margin:4px 0 6px"><button type="button" class="btn small" data-act="dall">Alle</button><button type="button" class="btn small" data-act="dnone">Keine</button></div>'+
+    ids.map(function(id){var p=findP(id);return '<label class="consent" style="margin-top:6px"><input type="checkbox" data-dsel="'+esc(id)+'"'+(dd.sel[id]!==false?' checked':'')+'><span>'+esc(fullName(p))+(sel[id]&&sel[id].rolle?' <span class="cl">'+esc(sel[id].rolle)+'</span>':'')+(p.selbst?'':' <span class="cl">kein App-Konto, nur per E-Mail</span>')+'</span></label>'}).join('')+
+    '<div class="acts" style="margin-top:12px"><button type="button" class="btn primary" data-act="dsend">In der App senden ('+n+')</button><button type="button" class="btn" data-act="dmail">Per E-Mail öffnen</button></div><p class="cl" style="margin:6px 0 0">„In der App senden“ zeigt die Dispo den Darstellern mit App-Konto unter „Anfragen und Buchungen“. „Per E-Mail öffnen“ bereitet eine Mail an alle markierten Darsteller vor (Empfänger verdeckt). Der automatische Versand per E-Mail kommt später.</p><div class="ferr" id="derr" role="alert"></div><div id="dhist">'+dispoHistHTML(pr)+'</div></div>';
+  return h;
+}
+function dispoHistHTML(pr){
+  var items=(state.dHist&&state.dHist[pr.id])||[];
+  if(!items.length)return '';
+  var seen=(state.dSeen&&state.dSeen[pr.id])||{};
+  return '<div class="fl" style="margin-top:14px">Bisher gesendet</div>'+items.slice().reverse().map(function(it){
+    var an=(it.an||[]),app=an.filter(function(i){var p=findP(i);return p&&p.selbst}),gs=app.filter(function(i){return seen[i]&&seen[i][it.id]}),ns=app.filter(function(i){return !(seen[i]&&seen[i][it.id])}).map(function(i){return fullName(findP(i))});
+    var d=new Date(it.at);
+    return '<div class="role" style="margin-top:8px"><b>'+esc(it.betreff||'Dispo')+'</b><div class="cl">'+esc(d.toLocaleDateString('de-DE')+', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}))+' an '+an.length+' Darsteller</div>'+(app.length?'<div class="cl">Gesehen: '+gs.length+' von '+app.length+' (App-Konten)'+(ns.length?'. Noch nicht: '+esc(ns.join(', ')):'')+'</div>':'')+'<div class="notes" style="white-space:pre-wrap;margin-top:6px">'+esc(it.text||'')+'</div></div>';
+  }).join('');
+}
+async function loadDispo(pr){
+  if(!pr||!db)return;
+  state.dHist=state.dHist||{};state.dSeen=state.dSeen||{};
+  try{
+    var sn=await db.doc('dispo/'+pr.id).get();
+    var items=sn.exists?((sn.data()||{}).items||[]):[];
+    state.dHist[pr.id]=items;
+    var seen={},pids={};
+    items.forEach(function(it){(it.an||[]).forEach(function(i){pids[i]=1})});
+    var keys=Object.keys(pids).filter(function(i){var p=findP(i);return p&&p.selbst});
+    for(var k=0;k<keys.length;k++){try{var bs=await db.doc('buchungen/'+keys[k]+'/e/'+pr.id).get();if(bs.exists)seen[keys[k]]=(bs.data()||{}).gesehen||{}}catch(e){}}
+    state.dSeen[pr.id]=seen;
+  }catch(e){return}
+  var el=$('#dhist');if(el&&state.pid===pr.id)el.innerHTML=dispoHistHTML(pr);
+}
+async function sendDispo(){
+  var pr=curProj(),dd=state.dDraft,err=$('#derr');if(!pr||!dd||state.dSending)return;
+  var ids=gebuchtIds(pr).filter(function(i){return dd.sel[i]!==false});
+  if(!String(dd.text||'').trim()){err.textContent='Schreibe zuerst den Dispo-Text.';return}
+  if(!ids.length){err.textContent='Wähle mindestens einen Empfänger.';return}
+  err.textContent='';state.dSending=true;
+  var b=$('[data-act="dsend"]');if(b){b.disabled=true;b.textContent='Sendet …'}
+  try{
+    var now=Date.now(),id='d'+now.toString(36),item={id:id,betreff:String(dd.betreff||'').trim()||'Dispo',text:String(dd.text).trim(),at:now,an:ids};
+    var hs=await db.doc('dispo/'+pr.id).get(),items=hs.exists?((hs.data()||{}).items||[]):[];
+    await db.doc('dispo/'+pr.id).set({projId:pr.id,items:items.concat([item])});
+    var noApp=0;
+    for(var i=0;i<ids.length;i++){
+      var p=findP(ids[i]);
+      if(!p.selbst){noApp++;continue}
+      var ref=db.doc('buchungen/'+ids[i]+'/e/'+pr.id),sn=await ref.get();
+      var o=sn.exists?(sn.data()||{}):{projId:pr.id,rolle:(pr.auswahl[ids[i]]||{}).rolle||'',ort:pr.ort||'',tage:pr.tage||[],at:now};
+      o.dispos=(o.dispos||[]).concat([{id:id,betreff:item.betreff,text:item.text,at:now}]);
+      await ref.set(o);
+    }
+    dd.text='';
+    toast('Dispo an '+(ids.length-noApp)+' Darsteller gesendet'+(noApp?'. '+noApp+' ohne App-Konto: bitte per E-Mail schicken.':''));
+    state.dSending=false;
+    renderProj();loadDispo(pr);
+  }catch(e){state.dSending=false;var b2=$('[data-act="dsend"]');if(b2){b2.disabled=false;b2.textContent='In der App senden'}if(err)err.textContent='Senden hat nicht geklappt. Versuche es noch einmal.'}
+}
+function mailDispo(){
+  var pr=curProj(),dd=state.dDraft,err=$('#derr');if(!pr||!dd)return;
+  var ids=gebuchtIds(pr).filter(function(i){return dd.sel[i]!==false});
+  var mails=ids.map(function(i){return findP(i).email}).filter(Boolean);
+  if(!String(dd.text||'').trim()){err.textContent='Schreibe zuerst den Dispo-Text.';return}
+  if(!mails.length){err.textContent='Bei den markierten Darstellern steht keine E-Mail im Profil.';return}
+  err.textContent='';
+  var a=document.createElement('a');
+  a.href='mailto:?bcc='+encodeURIComponent(mails.join(','))+'&subject='+encodeURIComponent(dd.betreff||'Dispo')+'&body='+encodeURIComponent(dd.text);
+  document.body.appendChild(a);a.click();a.remove();
+  if(ids.length>mails.length)toast('Mail vorbereitet. '+(ids.length-mails.length)+' ohne E-Mail im Profil.');
+}
 function startOwnView(p){
   state.gallery=[];
   if(!p.hasFoto)return;
@@ -1491,7 +1577,7 @@ function projFiltered(){
   return state.projects.filter(function(pr){
     if(state.pfirma&&firmOf(pr)!==state.pfirma)return false;
     if(!q.length)return true;
-    var hay=[pr.name,pr.produktion,pr.erstellerName,pr.ort,pr.notiz,pr.regieName,pr.regieMail].concat((pr.rollen||[]).map(function(r){return (r.name||'')+' '+(r.beschr||'')}),(pr.tage||[]).map(function(t){return tageStr([t])})).join(' ').toLowerCase();
+    var hay=[pr.name,pr.produktion,pr.art,pr.erstellerName,pr.ort,pr.notiz,pr.regieName,pr.regieMail].concat((pr.rollen||[]).map(function(r){return (r.name||'')+' '+(r.beschr||'')}),(pr.tage||[]).map(function(t){return tageStr([t])})).join(' ').toLowerCase();
     return q.every(function(w){return hay.indexOf(w)>=0});
   });
 }
@@ -1552,7 +1638,7 @@ function renderProjDetail(){
   if(!state.loaded){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Wird geladen</h3></div>';return}
   if(!pr){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Lege ein Projekt mit Drehtagen und Rollen an. Danach siehst du sofort, wer verfügbar ist und passt.</p></div>';return}
   var days=projDays(pr),roles=pr.rollen||[];
-  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span></p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
+  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span>'+(pr.art?' <span class="cl">'+esc(pr.art)+'</span>':'')+'</p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
   h+='<div class="sec" style="margin-top:14px"><h3>Drehtage</h3>'+((pr.tage||[]).filter(function(t){return t.von}).length?'<div class="days">'+(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('')+'</div><p class="cl" style="margin:6px 0 0">'+days.length+' Drehtag'+(days.length===1?'':'e')+' insgesamt</p>':'<span class="cl">Noch keine Drehtage eingetragen</span>')+'</div>';
   if(pr.regieName||pr.regieMail||pr.regieTel||pr.ort)h+='<div class="sec"><h3>Regie und Ort</h3>'+(pr.regieName?'<div class="cm">'+esc(pr.regieName)+'</div>':'')+copyRow(pr.regieMail)+copyRow(pr.regieTel)+(pr.ort?'<div class="cl">Drehort: '+esc(pr.ort)+'</div>':'')+(pr.oeffentlich?'<div class="cl">Für Bewerber sichtbar</div>':'')+'</div>';
   h+='<div class="sec"><h3>Anforderungen</h3>'+(roles.length?'<div class="rolegrid">'+roles.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div>'+(r.beschr?'<div class="cl">'+esc(r.beschr)+'</div>':'')+'</div>'}).join('')+'</div>':'<span class="cl">Keine Rollen angelegt, es werden alle Profile nach Verfügbarkeit gezeigt.</span>')+'</div>';
@@ -1582,6 +1668,7 @@ function renderProjDetail(){
       return '<div class="mwrap">'+cardHTML(p,statTag(st)+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':''))+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
     }).join('')+'</div>';
   }
+  h+=dispoHTML(pr,sel);
   var titles={full:days.length?'Verfügbar und passend':'Passend',part:'Teilweise verfügbar',open:'Verfügbarkeit noch nicht eintragbar',none:'Passend, aber an den Drehtagen nicht verfügbar'};
   var order=['full','part','open','none'],any=false;
   order.forEach(function(k){
@@ -1602,7 +1689,7 @@ function renderProjDetail(){
   host.innerHTML=h;
 }
 function projToDraft(pr){
-  var d={id:pr?pr.id:'',name:pr?pr.name||'':'',produktion:pr?pr.produktion||'':'',notiz:pr?pr.notiz||'':'',regieName:pr?pr.regieName||'':(role==='kunde'?myName:''),regieMail:pr?pr.regieMail||'':(role==='kunde'?myEmail:''),regieTel:pr?pr.regieTel||'':'',kundeId:pr?pr.kundeId||'':'',ort:pr?pr.ort||'':'',oeffentlich:!!(pr&&pr.oeffentlich),tage:[],rollen:[]};
+  var d={id:pr?pr.id:'',name:pr?pr.name||'':'',produktion:pr?pr.produktion||'':'',art:pr?pr.art||'':'',notiz:pr?pr.notiz||'':'',regieName:pr?pr.regieName||'':(role==='kunde'?myName:''),regieMail:pr?pr.regieMail||'':(role==='kunde'?myEmail:''),regieTel:pr?pr.regieTel||'':'',kundeId:pr?pr.kundeId||'':'',ort:pr?pr.ort||'':'',oeffentlich:!!(pr&&pr.oeffentlich),tage:[],rollen:[]};
   ((pr&&pr.tage)||[]).forEach(function(t){d.tage.push({von:t.von||'',bis:t.bis&&t.bis!==t.von?t.bis:''})});
   if(!d.tage.length)d.tage.push({von:'',bis:''});
   ((pr&&pr.rollen)||[]).forEach(function(r){var o={id:r.id};ROLEF.forEach(function(f){var v=r[f.k];o[f.k]=f.t==='list'?(v||[]).join(', '):(v==null?'':String(v))});d.rollen.push(o)});
@@ -1610,8 +1697,8 @@ function projToDraft(pr){
 }
 function projFormHTML(d){
   var h='<form id="pform" novalidate><div class="sh"><h2 id="sheetTitle">'+(d.id?'Projekt bearbeiten':'Neues Projekt')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>';
-  h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Projektname</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-prod">Produktion, Kunde</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
-  h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunden-ID <span class="hint">wird bei Kundenprojekten automatisch gesetzt</span></label><input id="p-kid" data-pf="kundeId" value="'+esc(d.kundeId)+'" autocomplete="off"></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' <span class="hint">sehen auch Bewerber</span>':'')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
+  h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Projektname'+(isAdmin?'':' *')+'</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-prod">Produktion, Kunde'+(isAdmin?'':' *')+'</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div><div class="fld"><label for="p-art">Was wird gedreht'+(isAdmin?'':' *')+'</label><input id="p-art" data-pf="art" value="'+esc(d.art)+'" autocomplete="off" placeholder="z. B. Kinofilm, Serie, Werbung"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
+  h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie'+(isAdmin?'':' *')+'</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie'+(isAdmin?'':' *')+'</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie'+(isAdmin?'':' *')+'</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunden-ID <span class="hint">wird bei Kundenprojekten automatisch gesetzt</span></label><input id="p-kid" data-pf="kundeId" value="'+esc(d.kundeId)+'" autocomplete="off"></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' <span class="hint">sehen auch Bewerber</span>':' *')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
   h+='<fieldset><legend>Drehtage</legend>'+d.tage.map(function(t,i){return '<div class="drow"><div class="fld"><label for="pt-v'+i+'">Von</label><input type="date" id="pt-v'+i+'" data-pt="'+i+'" data-k="von" value="'+esc(t.von)+'"></div><div class="fld"><label for="pt-b'+i+'">Bis <span class="hint">leer = ein Tag</span></label><input type="date" id="pt-b'+i+'" data-pt="'+i+'" data-k="bis" value="'+esc(t.bis)+'"></div><button type="button" class="btn small" data-act="ptdel" data-i="'+i+'" aria-label="Zeitraum entfernen">Entfernen</button></div>'}).join('')+'<button type="button" class="btn small" data-act="ptadd">Weiterer Zeitraum</button></fieldset>';
   h+='<fieldset><legend>Rollen und Anforderungen</legend><p class="cl" style="margin:0 0 10px">Leere Felder bedeuten: egal. Beim Alter wird das Spielalter geprüft.</p>'+d.rollen.map(function(r,i){
     return '<div class="edrow"><div class="cols wide">'+ROLEF.map(function(f){
@@ -1649,12 +1736,19 @@ async function saveProj(){
     });
     return o;
   }).filter(function(o){return Object.keys(o).length>1});
+  if(!isAdmin){
+    var mp=[['produktion','p-prod','die Produktion'],['art','p-art','was gedreht wird'],['ort','p-ort','den Drehort'],['regieName','p-rn','die Ansprechperson'],['regieMail','p-rm','die E-Mail der Ansprechperson'],['regieTel','p-rt','die Telefonnummer der Ansprechperson']];
+    for(var mi=0;mi<mp.length;mi++){if(!String(d[mp[mi][0]]||'').trim()){err.textContent='Bitte trage '+mp[mi][2]+' ein. Pflichtfelder sind mit * markiert.';var me=$('#'+mp[mi][1]);if(me)me.focus();return}}
+  }
+  if(!tage.length){err.textContent='Trage mindestens einen Drehtag ein.';var tf=$('#pt-v0');if(tf)tf.focus();return}
+  if(!rollen.length){err.textContent='Lege mindestens eine Rolle an und trage ihren Namen oder eine Anforderung ein.';return}
   err.textContent='';btn.disabled=true;btn.textContent='Speichert …';
   try{
     var old=d.id?curProj():null;
     var ref=d.id?db.doc('projekte/'+d.id):db.collection('projekte').doc();
     var rec={name:d.name.trim(),tage:tage,rollen:rollen,createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
     if(d.produktion.trim())rec.produktion=d.produktion.trim();
+    if(d.art.trim())rec.art=d.art.trim();
     if(d.notiz.trim())rec.notiz=d.notiz.trim();
     if(d.regieName.trim())rec.regieName=d.regieName.trim();
     if(d.regieMail.trim())rec.regieMail=d.regieMail.trim();
@@ -1743,7 +1837,7 @@ function bookSel(pid){
   if(p&&p.email){var a=document.createElement('a');a.href=bookMail(p,pr,rolle);document.body.appendChild(a);a.click();a.remove();toast('Gebucht. Die Mail ist vorbereitet, tippe im Mailprogramm auf Senden.')}
   else toast('Als gebucht eingetragen. Im Profil steht keine E-Mail, daher keine Mail.');
   saveSel(pr,m);
-  if(p&&p.selbst){db.doc('buchungen/'+pid+'/e/'+pr.id).set({projId:pr.id,rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:Date.now()}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
+  if(p&&p.selbst){var bref=db.doc('buchungen/'+pid+'/e/'+pr.id);bref.get().then(function(sn){var o=sn.exists?(sn.data()||{}):{};return bref.set(Object.assign({},o,{projId:pr.id,rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:o.at||Date.now()}))}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
 }
 async function sendSel(){
   var pr=curProj();if(!pr||!pr.kundeId||state.sending)return;
@@ -1828,9 +1922,18 @@ async function loadBuchungen(){
   arr.sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
   var h='<div class="selfwrap"><h2 style="font-size:26px">Deine Buchungen</h2>';
   if(!arr.length)return h+'<p class="cl" style="margin:4px 0 0">Noch keine Buchungen. Die Agentur meldet sich per E-Mail bei dir.</p></div>';
-  return h+'<div class="rolegrid" style="margin-top:12px">'+arr.map(function(b){
-    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht. Weitere Infos bekommst du per E-Mail.</div></div>';
+  var out=h+'<div class="rolegrid" style="margin-top:12px">'+arr.map(function(b){
+    var ds=(b.dispos||[]).slice().sort(function(x,y){return y.at-x.at}),g=b.gesehen||{};
+    var dh=ds.map(function(d){var nw=!g[d.id],dt=new Date(d.at);return '<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px"><span class="pill">Dispo</span>'+(nw?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+' <b>'+esc(d.betreff||'Dispo')+'</b><div class="cl">'+esc(dt.toLocaleDateString('de-DE'))+'</div><div class="notes" style="white-space:pre-wrap;margin-top:4px">'+esc(d.text||'')+'</div></div>'}).join('');
+    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht.'+(ds.length?'':' Weitere Infos bekommst du per E-Mail.')+'</div>'+dh+'</div>';
   }).join('')+'</div></div>';
+  arr.forEach(function(b){
+    var ds=b.dispos||[];if(!ds.length||!b.projId)return;
+    var g=Object.assign({},b.gesehen||{}),ch=false;
+    ds.forEach(function(d){if(!g[d.id]){g[d.id]=Date.now();ch=true}});
+    if(ch)db.doc('buchungen/'+uid+'/e/'+b.projId).update({gesehen:g}).catch(function(){});
+  });
+  return out;
 }
 async function renderBuch(){
   var host=$('#v-buch');
