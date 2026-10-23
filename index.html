@@ -228,6 +228,14 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 
 .plzrow{display:grid;grid-template-columns:110px 1fr;gap:12px;margin-top:12px}
 
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--danger);margin-left:6px;vertical-align:middle;flex:0 0 auto}
+.msg{border-top:1px solid var(--line);margin-top:10px}
+.msgh{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 0;font:inherit;color:inherit;cursor:pointer}
+.msgh .mt{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.msgh .dot{margin-left:0}
+.msg.new .mt{font-weight:700}
+.msgb{padding:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+
 </style>
 </head>
 <body>
@@ -250,11 +258,12 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
   </header>
   <nav class="tabs navtabs" id="nav" aria-label="Masken" hidden>
     <button type="button" class="tab" data-act="view" data-v="kartei" aria-pressed="true">Kartei</button>
-    <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte</button>
+    <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte<span class="dot" id="pdot" hidden aria-label="Neue Antwort vom Kunden"></span></button>
     <button type="button" class="tab" data-act="view" data-v="pruef" aria-pressed="false">Zu prüfen <span class="badge" id="pbadge" hidden>0</span></button>
+    <button type="button" class="tab" data-act="view" data-v="konten" aria-pressed="false">Konten <span class="badge" id="kbadge" hidden>0</span></button>
     <button type="button" class="tab" data-act="view" data-v="self" aria-pressed="false">Mein Profil</button>
     <button type="button" class="tab" data-act="view" data-v="edit" aria-pressed="false">Profil bearbeiten</button>
-    <button type="button" class="tab" data-act="view" data-v="buch" aria-pressed="false">Anfragen und Buchungen</button>
+    <button type="button" class="tab" data-act="view" data-v="buch" aria-pressed="false">Anfragen und Buchungen<span class="dot" id="bdot" hidden aria-label="Neue Nachricht"></span></button>
     <button type="button" class="tab" data-act="view" data-v="kunde" aria-pressed="false">Für Produktionen</button>
   </nav>
 
@@ -285,6 +294,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
   </div>
   <div id="v-proj" hidden></div>
   <div id="v-pruef" hidden></div>
+  <div id="v-konten" hidden></div>
   <div id="v-self" hidden></div>
   <div id="v-edit" hidden></div>
   <div id="v-kunde" hidden></div>
@@ -385,7 +395,7 @@ async function createLocal() {
     collection: (p) => coll(p),
     doc: (p) => { const q = p.split('/'); const id = q.pop(); return ref(q.join('/'), id); }
   };
-  const info = (uid) => { const u = C('users')[uid]; return u ? { uid, email: u.email, name: u.name, role: u.rolle, reg: u.reg || null, freigabe: u.freigabe || null } : null; };
+  const info = (uid) => { const u = C('users')[uid]; return u ? { uid, email: u.email, name: u.name, role: u.rolle, reg: u.reg || null, freigabe: u.freigabe || null, gesperrt: !!u.gesperrt, geloescht: !!u.geloescht, loeschantrag: u.loeschantrag || null } : null; };
   return {
     mode: 'local',
     db,
@@ -407,6 +417,11 @@ async function createLocal() {
     },
     async reset() {},
     async signOut() { store.session = null; persist(); },
+    async changePassword(oldPw, newPw) {
+      const uid = store.session;
+      if (!uid || (store.accounts[uid] || '') !== oldPw) throw { code: 'auth/invalid-credential' };
+      store.accounts[uid] = newPw; persist();
+    },
     async deleteAccount() { if (store.session) { delete C('users')[store.session]; store.session = null; persist(); } },
     resetAll() { localStorage.removeItem(KEY); store = null; }
   };
@@ -450,7 +465,7 @@ async function createFire(cfg) {
   async function fetchInfo(u) {
     const s = await F.getDoc(F.doc(fs, 'users/' + u.uid));
     const d = s.exists() ? s.data() : null;
-    return { uid: u.uid, email: u.email || '', name: (d && d.name) || '', role: (d && d.rolle) || null, reg: (d && d.reg) || null, freigabe: (d && d.freigabe) || null };
+    return { uid: u.uid, email: u.email || '', name: (d && d.name) || '', role: (d && d.rolle) || null, reg: (d && d.reg) || null, freigabe: (d && d.freigabe) || null, gesperrt: !!(d && d.gesperrt), geloescht: !!(d && d.geloescht), loeschantrag: (d && d.loeschantrag) || null };
   }
   return {
     mode: 'firebase',
@@ -473,6 +488,11 @@ async function createFire(cfg) {
     },
     reset: (email) => AU.sendPasswordResetEmail(auth, email),
     signOut: () => AU.signOut(auth),
+    async changePassword(oldPw, newPw) {
+      const u = auth.currentUser;
+      await AU.reauthenticateWithCredential(u, AU.EmailAuthProvider.credential(u.email, oldPw));
+      await AU.updatePassword(u, newPw);
+    },
     async deleteAccount() { if (auth.currentUser) await AU.deleteUser(auth.currentUser); }
   };
 }
@@ -527,7 +547,7 @@ var TOGGLES=[
  {k:'brille',label:'Brillenträger'}
 ];
 
-var state={people:[],users:[],pOpen:false,ptab:'neu',pq:'',pfirma:'',psort:'tag',q:'',typ:'alle',sort:'name',f:newFilters(),loaded:false,nodb:false,err:'',panelSig:'',confirmEx:false,photoEdits:{},photoDocs:{},photoLoad:null,gallery:[],galIdx:0,cal:null,detailLoad:null,view:'kartei',projects:[],pid:'',roleSel:'',pdraft:null,confirmDelP:false,confirmSelf:false,kDelId:'',selfOk:false,decAll:{},decKey:'',decUnsub:null,sending:false,kdocs:{}};
+var state={people:[],users:[],lAntrag:!!ctx.loeschantrag,lConfirm:false,kq:'',kf:'alle',mg:'alle',mnews:true,kBusy:false,kConfirm:null,pOpen:false,ptab:'neu',pq:'',pfirma:'',psort:'tag',q:'',typ:'alle',sort:'name',f:newFilters(),loaded:false,nodb:false,err:'',panelSig:'',confirmEx:false,photoEdits:{},photoDocs:{},photoLoad:null,gallery:[],galIdx:0,cal:null,detailLoad:null,view:'kartei',projects:[],pid:'',roleSel:'',pdraft:null,confirmDelP:false,confirmSelf:false,kDelId:'',selfOk:false,decAll:{},decKey:'',decUnsub:null,sending:false,kdocs:{}};
 var db=ctx.db,canWrite=true,role=ctx.role,isAdmin=ctx.role==='admin',uid=ctx.uid,myName=ctx.name||'',myEmail=ctx.email||'';
 
 function $(s,r){return (r||document).querySelector(s)}
@@ -542,7 +562,7 @@ function ageOf(p){
   return p.geburtsjahr?YEAR-p.geburtsjahr:null;
 }
 var AGENTUR_MAIL='';
-function profOK(p){return !p.freigabe||p.freigabe==='ok'}
+function profOK(p){return (!p.freigabe||p.freigabe==='ok')&&!p.gesperrt&&!p.loeschantrag}
 function hasSch(p){return (p.typ||[]).indexOf('Schauspieler')>=0}
 function schOK(p){return !!p&&(p.schauspielerStatus==='geprueft'||!p.selbst)}
 function isKD(p){return !!(p&&(p.sprechrollen||p.tagesrollen))}
@@ -679,7 +699,10 @@ function cardHTML(p,extra){
   if(extra)tags+=extra;
   if(p.freigabe==='neu')tags+='<span class="warn">Neu, zu prüfen</span>';
   if(p.freigabe==='abgelehnt')tags+='<span class="warn">Abgelehnt</span>';
+  if(p.gesperrt)tags+='<span class="warn">Gesperrt</span>';
+  if(p.loeschantrag)tags+='<span class="warn">Löschantrag</span>';
   if(!p.einwilligung)tags+='<span class="warn">Einwilligung fehlt</span>';
+  var ka=kalAlter(p);if(ka!==null&&ka>30)tags+='<span class="warn">Kalender alt</span>';
   return '<button type="button" class="card" data-act="open" data-id="'+esc(p.id)+'">'+
     '<div class="ph">'+(p.thumb?'<img alt="" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</div>'+
     '<div class="ci"><div class="cn">'+esc(fullName(p))+'</div>'+
@@ -787,7 +810,7 @@ function detailHTML(p,confirmDel,ro,own){
   if(p.agentur&&!own)h+='<p class="cl" style="margin:2px 0 0">Vermittelt über '+esc(p.agentur)+'</p>';
   h+='</div></div>';
   if(p.hasFoto)h+='<div class="sec"><h3>Fotos</h3><div class="pthumbs" id="dphotos"><span class="cl">Fotos werden geladen …</span></div></div>';
-  if(!own)h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+calHTML(p,false)+'</div>';
+  if(!own)h+='<div class="sec" id="availsec"><h3>Verfügbarkeit</h3>'+kalInfoHTML(p)+calHTML(p,false)+'</div>';
   h+='<div class="sec"><h3>Aussehen und Maße</h3><dl class="facts">'+
     fact('Geschlecht',p.geschlecht)+fact('Alter',age,'J')+fact(p.geburtsdatum?'Geburtsdatum':'Geburtsjahr',p.geburtsdatum?p.geburtsdatum.split('-').reverse().join('.'):p.geburtsjahr)+
     (hasSch(p)?fact('Spielalter',p.spielVon!=null?(p.spielBis!=null&&p.spielBis!==p.spielVon?p.spielVon+'–'+p.spielBis:p.spielVon):'','J'):'')+
@@ -799,7 +822,7 @@ function detailHTML(p,confirmDel,ro,own){
   h+='<div class="sec"><h3>Fertigkeiten</h3>'+chipList(p.fertigkeiten)+'</div>';
   h+='<div class="sec"><h3>Führerschein</h3>'+chipList(p.fuehrerschein)+'</div>';
   if(p.erfahrung)h+='<div class="sec"><h3>Erfahrung</h3><div class="notes">'+esc(p.erfahrung)+'</div></div>';
-  if(linkHTML(p.link))h+='<div class="sec"><h3>Link</h3><div class="notes">'+linkHTML(p.link)+'</div></div>';
+  if(linkHTML(p.link)||linkHTML(p.link2))h+='<div class="sec"><h3>Links</h3><div class="notes">'+[linkHTML(p.link),linkHTML(p.link2)].filter(Boolean).join('<br>')+'</div></div>';
   h+='<div class="sec"><h3>'+(own?'Kontakt':'Kontakt und Konditionen')+'</h3>'+copyRow(p.telefon)+copyRow(p.email)+copyRow(p.instagram)+copyRow(p.social)+
     (!own&&hasSch(p)&&p.gage!=null&&p.gage!==''?'<dl class="facts">'+fact('Tagesgage',p.gage,'€')+'</dl><p class="cl" style="margin:4px 0 0">Die Gage kann mit jedem Projekt neu verhandelt werden.</p>':'')+
     (!p.telefon&&!p.email&&!p.instagram&&!p.social&&!(hasSch(p)&&p.gage!=null&&p.gage!=='')?'<span class="cl">Keine Angaben</span>':'')+'</div>';
@@ -857,7 +880,7 @@ function formHTML(p,self){
     '<div class="fld" style="margin-top:12px"><div class="fl">Führerschein</div>'+checks('fuehrerschein',optsFor(gFs),p.fuehrerschein||[])+'</div>'+
     (self&&hasSch(p)?'':'<div class="fld" style="margin-top:12px"><div class="fl">Rollenerfahrung</div><label class="consent"><input type="checkbox" id="f-tages"'+(p.tagesrollen?' checked':'')+'><span>Ich habe Erfahrung mit Tagesrollen (ohne Text)</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="f-sprech"'+(p.sprechrollen?' checked':'')+'><span>Ich habe Erfahrung mit Textrollen</span></label></div>')+
     '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div>'+
-    '<div class="fld" style="margin-top:12px"><label for="f-link">Link zu Vorstellungsvideo, Homepage oder externem Profil</label><input id="f-link" type="text" inputmode="url" autocomplete="off" placeholder="z. B. vimeo.com/… oder meine-seite.de" value="'+esc(p.link||'')+'"></div></fieldset>';
+    '<div class="fld" style="margin-top:12px"><label for="f-link">Link zu Vorstellungsvideo, Homepage oder externem Profil</label><input id="f-link" type="text" inputmode="url" autocomplete="off" placeholder="z. B. vimeo.com/… oder meine-seite.de" value="'+esc(p.link||'')+'"></div><div class="fld" style="margin-top:12px"><label for="f-link2">Weiteres Video oder Profil <span class="hint">optional</span></label><input id="f-link2" type="text" inputmode="url" autocomplete="off" placeholder="z. B. youtube.com/…" value="'+esc(p.link2||'')+'"></div></fieldset>';
   h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
     inp('f-telefon','Telefon'+(self?' *':''),p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',self?(myEmail||p.email):p.email,'type="text" inputmode="email" autocomplete="off"'+(self?' readonly':''))+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
     (self?'':'<div id="gagefld"'+(hasSch(p)?'':' hidden')+'>'+inp('f-gage','Tagesgage (€), nur Schauspieler',p.gage,'inputmode="decimal"')+'<p class="cl" style="margin:4px 0 0">Nur intern. Die Gage kann mit jedem Projekt neu verhandelt werden.</p></div>')+'</div>'+
@@ -865,7 +888,7 @@ function formHTML(p,self){
   if(self)h+='<fieldset><legend>Wann hast du Zeit?</legend>'+calHTML(p,true)+'</fieldset>';
   if(self&&p.einwilligung)h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw" checked disabled><span>Eingewilligt bei der Registrierung: Die Agentur speichert meine Daten und Fotos und nutzt sie zur Vermittlung an Produktionen (DSGVO).'+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
   else h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
-  h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="saveBtn" data-id="'+esc(p.id||'')+'">'+(self?'Profil speichern':'Speichern')+'</button>'+(self?(p.id?'<button type="button" class="btn danger" data-act="selfdel">'+(state.confirmSelf?'Wirklich löschen':'Mein Profil löschen')+'</button>':''):'<button type="button" class="btn" data-act="close">Abbrechen</button>')+'</div></form>';
+  h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="saveBtn" data-id="'+esc(p.id||'')+'">'+(self?'Profil speichern':'Speichern')+'</button>'+(self?'':'<button type="button" class="btn" data-act="close">Abbrechen</button>')+'</div></form>';
   return h;
 }
 
@@ -902,7 +925,7 @@ function readForm(self){
     strasse:val('f-strasse'),plz:val('f-plz'),ort:val('f-ort'),agentur:val('f-agentur'),typ:checked('typ'),
     groesse:num(val('f-groesse')),gewicht:num(val('f-gewicht')),konfektion:val('f-konfektion'),schuh:num(val('f-schuh')),
     haarfarbe:val('f-haarfarbe'),haarlaenge:val('f-haarlaenge'),augenfarbe:val('f-augenfarbe'),bart:val('f-bart'),tattoos:val('f-tattoos'),
-    brille:$('#f-brille').checked,sprechrollen:$('#f-sprech')?$('#f-sprech').checked:!!(oldF().sprechrollen),tagesrollen:$('#f-tages')?$('#f-tages').checked:!!(oldF().tagesrollen),link:safeUrl(val('f-link')),
+    brille:$('#f-brille').checked,sprechrollen:$('#f-sprech')?$('#f-sprech').checked:!!(oldF().sprechrollen),tagesrollen:$('#f-tages')?$('#f-tages').checked:!!(oldF().tagesrollen),link:safeUrl(val('f-link')),link2:safeUrl(val('f-link2')),
     sprachen:uniq(checked('sprachen').concat(extra('f-sprachenx'))),dialekte:val('f-dialekte'),
     fertigkeiten:uniq(checked('fertigkeiten').concat(extra('f-skillsx'))),fuehrerschein:checked('fuehrerschein'),
     erfahrung:val('f-erfahrung'),telefon:val('f-telefon'),email:val('f-email'),instagram:val('f-instagram'),social:val('f-social'),gage:num(val('f-gage')),
@@ -988,8 +1011,19 @@ document.addEventListener('click',function(e){
   else if(act==='avail'){var ap=findP(id),sec=$('#availsec');if(ap&&sec&&state.cal){sec.innerHTML='<h3>Verfügbarkeit ändern</h3>'+calHTML(ap,true);sec.scrollIntoView({block:'start'});t.hidden=true}}
   else if(act==='khok'){state.kHintHide=true;renderKunde()}
   else if(act==='khnever'){state.kHintHide=true;try{localStorage.setItem(kHintKey(),'1')}catch(e){}renderKunde()}
+  else if(act==='kpw'){changePw()}
+  else if(act==='kdl'){exportMine()}
+  else if(act==='lreq'){if(!state.lConfirm){state.lConfirm=true;t.textContent='Wirklich beantragen'}else requestDelete(false)}
+  else if(act==='lwith'){requestDelete(true)}
+  else if(act==='kf'){state.kf=t.dataset.v;fillKonten()}
+  else if(act==='kask'){state.kConfirm={id:id,act:t.dataset.do};if(t.dataset.do==='unlock'){state.kConfirm=null;kontoAction(id,'unlock')}else fillKonten()}
+  else if(act==='kno'){state.kConfirm=null;fillKonten()}
+  else if(act==='kokact'){kontoAction(id,t.dataset.do)}
+  else if(act==='mcopy'){var ml=mailGroup();if(!ml.length){toast('Keine Adressen in dieser Auswahl.')}else{var txt=ml.join(', ');var done=function(){toast(ml.length+' Adressen kopiert')};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,function(){window.prompt('Adressen kopieren:',txt)});else window.prompt('Adressen kopieren:',txt)}}
+  else if(act==='kbackup'){backupAll()}
   else if(act==='ptab'){state.ptab=t.dataset.v;fillPList()}
-  else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0);loadDispo(curProj())}
+  else if(act==='popen'){state.pid=id;state.pOpen=true;state.roleSel='';state.confirmDelP=false;renderProj();window.scrollTo(0,0);loadDispo(curProj());var op=curProj();if(op&&neueAntwort(op)){op.adminGesehenAt=Date.now();db.doc('projekte/'+op.id).update({adminGesehenAt:op.adminGesehenAt}).catch(function(){});updateProjDot()}}
+  else if(act==='msg'){toggleMsg(t.dataset.p,t.dataset.d)}
   else if(act==='dsend'){sendDispo()}
   else if(act==='dmail'){mailDispo()}
   else if(act==='dall'||act==='dnone'){var dp=curProj();if(dp&&state.dDraft){gebuchtIds(dp).forEach(function(i){state.dDraft.sel[i]=(act==='dall')});renderProj()}}
@@ -1052,6 +1086,7 @@ document.addEventListener('input',function(e){
   else if(t.dataset&&t.dataset.pt!=null&&t.dataset.pt!==''&&state.pdraft){state.pdraft.tage[+t.dataset.pt][t.dataset.k]=t.value}
   else if(t.dataset&&t.dataset.pr!=null&&t.dataset.pr!==''&&state.pdraft){state.pdraft.rollen[+t.dataset.pr][t.dataset.k]=t.value}
   else if(t.id==='pq'){state.pq=t.value;fillPList()}
+  else if(t.id==='kq'){state.kq=t.value;fillKonten()}
   else if(t.dataset&&t.dataset.dd&&state.dDraft){state.dDraft[t.dataset.dd]=t.value}
   else if(t.dataset&&t.dataset.dsel&&state.dDraft){state.dDraft.sel[t.dataset.dsel]=t.checked}
   else if(t.id==='q'){state.q=t.value.trim();renderList()}
@@ -1063,6 +1098,9 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('change',function(e){
   var t=e.target;
+  if(t.id==='k-news'){saveNews(t.checked);return}
+  if(t.id==='mgrp'){state.mg=t.value;refreshMailCount();return}
+  if(t.id==='mnews'){state.mnews=t.checked;refreshMailCount();return}
   if(t.id==='pfirma'){state.pfirma=t.value;fillPList();return}
   if(t.id==='psort'){state.psort=t.value;fillPList();return}
   if(t.name==='typ'&&t.closest&&t.closest('#form')){
@@ -1286,6 +1324,17 @@ function daysBetween(a,b){
 function nextFree(p){var t=todayStr();var a=(p.verfDates||[]).filter(function(x){return x>=t}).sort();return a[0]||null}
 function fmtDM(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'}
 function calDaysOfWeek(w){var st=weekStart(new Date()),out=[];for(var i=0;i<7;i++){var d=new Date(st);d.setDate(st.getDate()+w*7+i);out.push(ymd(d))}return out}
+function kalAlter(p){
+  if(!p.selbst)return null;
+  if(!p.kalenderAt)return -1;
+  return Math.floor((Date.now()-p.kalenderAt)/86400000);
+}
+function kalInfoHTML(p){
+  var a=kalAlter(p);if(a===null)return '';
+  if(a<0)return '<p class="warn" style="margin:0 0 8px">Der Kalender wurde noch nicht aktualisiert.</p>';
+  var txt='Kalender zuletzt aktualisiert am '+new Date(p.kalenderAt).toLocaleDateString('de-DE')+'.';
+  return a>30?'<p class="warn" style="margin:0 0 8px">'+txt+' Das ist über einen Monat her, die Angaben sind vielleicht veraltet.</p>':'<p class="cl" style="margin:0 0 8px">'+txt+'</p>';
+}
 function calHTML(p,editable){
   var set=new Set(p.verfDates||[]),today=todayStr();
   var start=weekStart(new Date()),end=new Date(start);
@@ -1337,7 +1386,7 @@ async function saveCal(c){
   if(c.busy){c.dirty=true;return}
   c.busy=true;c.dirty=false;
   try{
-    await db.doc('people/'+c.id).update({verfDates:Array.from(c.set).sort(),updatedAt:Date.now()});
+    await db.doc('people/'+c.id).update({verfDates:Array.from(c.set).sort(),kalenderAt:Date.now(),updatedAt:Date.now()});
     calStat('Verfügbarkeit gespeichert');
   }catch(e){calStat('Speichern hat nicht geklappt. Tippe noch einmal auf einen Tag.',true)}
   c.busy=false;
@@ -1368,13 +1417,13 @@ async function removeExamples(){
 
 /* ---------- Masken ---------- */
 function fmtDMY(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)}
-function tabsFor(r){return r==='admin'?['kartei','proj','pruef']:r==='kunde'?['kunde']:['self','edit','buch']}
+function tabsFor(r){return r==='admin'?['kartei','proj','pruef','konten']:r==='kunde'?['kunde']:['self','edit','buch']}
 function setView(v){
   var tabs=tabsFor(role);
   if(tabs.indexOf(v)<0)v=tabs[0];
   flushCal();
   state.view=v;
-  ['kartei','proj','self','edit','kunde','buch','pruef'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
+  ['kartei','proj','self','edit','kunde','buch','pruef','konten'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
   Array.prototype.forEach.call(document.querySelectorAll('#nav .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));b.hidden=tabs.indexOf(b.dataset.v)<0});
   $('#nav').hidden=tabs.length<2;
   $('#topact').hidden=!(isAdmin&&v==='kartei');
@@ -1383,14 +1432,178 @@ function setView(v){
   else if(v==='kunde')renderKunde();
   else if(v==='buch')renderBuch();
   else if(v==='pruef')renderPruef();
+  else if(v==='konten')renderKonten();
   else if(v==='edit')renderSelf();
   else renderSelfView();
 }
 function calEndStr(){var e=weekStart(new Date());e.setDate(e.getDate()+WEEKS*7-1);return ymd(e)}
 
+/* ---------- Konto: Passwort, Daten, Löschantrag ---------- */
+function kontoHTML(){
+  var isB=role==='bewerber';
+  var news=!!((ctx.reg||{}).news);
+  var h='<div class="selfwrap" id="kontosec" style="margin-top:16px"><h2 style="font-size:24px">Konto</h2>';
+  if(state.lAntrag)h+='<p class="warn" role="status">Dein Löschantrag liegt vor. '+(isB?'Dein Profil ist gesperrt und wird nicht mehr vorgeschlagen, ':'')+'bis die Agentur ihn bearbeitet hat.</p><div class="acts" style="border:0;padding:0"><button type="button" class="btn" data-act="lwith">Antrag zurückziehen</button></div>';
+  if(isB)h+='<label class="consent" style="margin-top:10px"><input type="checkbox" id="k-news"'+(news?' checked':'')+'><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label>';
+  h+='<div class="fl" style="margin-top:14px">Passwort ändern</div><div class="cols wide"><div class="fld"><label for="kp-o">Aktuelles Passwort</label><input id="kp-o" type="password" autocomplete="current-password"></div><div class="fld"><label for="kp-n">Neues Passwort</label><input id="kp-n" type="password" autocomplete="new-password"></div><div class="fld"><label for="kp-n2">Neues Passwort wiederholen</label><input id="kp-n2" type="password" autocomplete="new-password"></div></div><div class="ferr" id="kp-err" role="alert"></div><div class="acts" style="border:0;padding:0;margin-top:6px"><button type="button" class="btn" data-act="kpw">Passwort ändern</button></div>';
+  h+='<div class="fl" style="margin-top:14px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
+  return h;
+}
+async function changePw(){
+  var o=$('#kp-o').value,n=$('#kp-n').value,n2=$('#kp-n2').value,err=$('#kp-err');
+  if(!o||!n){err.textContent='Trage das aktuelle und das neue Passwort ein.';return}
+  if(n.length<8){err.textContent='Das neue Passwort ist zu kurz. Nimm mindestens 8 Zeichen.';return}
+  if(n!==n2){err.textContent='Die beiden neuen Passwörter stimmen nicht überein.';return}
+  if(!ctx.changePassword){err.textContent='Das ist hier nicht möglich.';return}
+  err.textContent='';
+  try{await ctx.changePassword(o,n);$('#kp-o').value='';$('#kp-n').value='';$('#kp-n2').value='';toast('Passwort geändert')}
+  catch(e){var c=(e&&e.code)||'';err.textContent=(c==='auth/wrong-password'||c==='auth/invalid-credential')?'Das aktuelle Passwort stimmt nicht.':c==='auth/too-many-requests'?'Zu viele Versuche. Warte kurz und versuche es später noch einmal.':'Das Ändern hat nicht geklappt.'}
+}
+async function exportMine(){
+  var b=$('[data-act="kdl"]');if(b){b.disabled=true;b.textContent='Wird erstellt …'}
+  try{
+    var out={erstellt:new Date().toISOString(),konto:{email:myEmail,name:myName,rolle:role}};
+    if(role==='bewerber'){
+      var sn=await db.doc('people/'+uid).get();
+      if(sn.exists){var p=Object.assign({},sn.data()||{},{id:uid});out.profil=p;if(p.hasFoto){try{var ph=await loadPhotos(p);out.fotos={};Object.keys(ph).forEach(function(k){out.fotos[k]=ph[k].data||ph[k].thumb})}catch(e){}}}
+      try{var bq=await db.collection('buchungen/'+uid+'/e').get();out.buchungen=bq.docs.map(function(d){return d.data()||{}})}catch(e){}
+    }else{
+      out.projekte=state.projects;
+      try{var aq=await db.collection('kunden/'+uid+'/auswahl').get();out.auswahl=aq.docs.map(function(d){var o=Object.assign({},d.data()||{});if(o.snap){o.snap=Object.assign({},o.snap);delete o.snap.fotos}return o})}catch(e){}
+    }
+    downloadJSON('meine-daten-'+todayStr()+'.json',out);
+  }catch(e){toast('Der Download hat nicht geklappt.')}
+  if(b){b.disabled=false;b.textContent='Meine Daten herunterladen'}
+}
+async function requestDelete(withdraw){
+  try{
+    var v=withdraw?null:Date.now();
+    await db.doc('users/'+uid).update({loeschantrag:v});
+    if(role==='bewerber'){try{var sn=await db.doc('people/'+uid).get();if(sn.exists)await db.doc('people/'+uid).update({loeschantrag:v})}catch(e){}}
+    state.lAntrag=!withdraw;state.lConfirm=false;
+    toast(withdraw?'Antrag zurückgezogen':'Löschantrag gestellt');
+    if(role==='bewerber')renderSelf(withdraw?'Antrag zurückgezogen.':'Dein Löschantrag wurde gestellt.');else renderKunde();
+  }catch(e){toast('Das hat nicht geklappt. Versuche es noch einmal.')}
+}
+async function saveNews(on){
+  try{
+    var sn=await db.doc('users/'+uid).get(),reg=Object.assign({},(sn.exists?(sn.data()||{}).reg:null)||{});
+    reg.news=!!on;await db.doc('users/'+uid).update({reg:reg});ctx.reg=reg;toast(on?'Gespeichert: Du bekommst gelegentlich Infos.':'Gespeichert: Keine Infos per E-Mail.');
+  }catch(e){toast('Speichern hat nicht geklappt.')}
+}
+
+/* ---------- Konten (Admin) ---------- */
+function kontoRow(u){
+  var p=findP(u.id),isB=u.rolle==='bewerber';
+  var nm=isB&&p?fullName(p):(u.name||'Ohne Namen');
+  var tags='<span class="pill">'+(isB?'Darsteller':'Produktion')+'</span>';
+  if(u.gesperrt)tags+=' <span class="warn">Gesperrt</span>';
+  if(u.loeschantrag)tags+=' <span class="warn">Löschantrag seit '+esc(new Date(u.loeschantrag).toLocaleDateString('de-DE'))+'</span>';
+  if(u.rolle==='kunde'&&u.freigabe==='offen')tags+=' <span class="cl">wartet auf Freigabe</span>';
+  var conf=state.kConfirm&&state.kConfirm.id===u.id?state.kConfirm.act:'';
+  var acts=conf?'<span class="cl" style="flex:1 1 100%">'+(conf==='del'?'Alle Daten endgültig löschen?':'Konto sperren? Fotos werden dabei gelöscht.')+'</span><button type="button" class="btn small danger" data-act="kokact" data-id="'+esc(u.id)+'" data-do="'+conf+'">Ja, '+(conf==='del'?'löschen':'sperren')+'</button><button type="button" class="btn small" data-act="kno">Abbrechen</button>':
+    (u.gesperrt?'<button type="button" class="btn small" data-act="kask" data-id="'+esc(u.id)+'" data-do="unlock">Entsperren</button>':'<button type="button" class="btn small" data-act="kask" data-id="'+esc(u.id)+'" data-do="lock">Sperren</button>')+
+    (isB&&p?'<button type="button" class="btn small" data-act="open" data-id="'+esc(u.id)+'">Profil</button>':'')+
+    '<button type="button" class="btn small danger" data-act="kask" data-id="'+esc(u.id)+'" data-do="del">Löschen</button>';
+  return '<div class="role" style="margin-top:10px"><b>'+esc(nm)+'</b><div class="cl">'+esc(u.email||'')+'</div><div style="margin-top:6px">'+tags+'</div><div class="pbar" style="margin:8px 0 0">'+acts+'</div></div>';
+}
+function kontenFiltered(){
+  var q=state.kq.toLowerCase().split(/\s+/).filter(Boolean),f=state.kf;
+  return state.users.filter(function(u){
+    if(u.rolle==='admin'||u.geloescht)return false;
+    if(f==='bew'&&u.rolle!=='bewerber')return false;
+    if(f==='prod'&&u.rolle!=='kunde')return false;
+    if(f==='sperr'&&!u.gesperrt)return false;
+    if(f==='antr'&&!u.loeschantrag)return false;
+    if(!q.length)return true;
+    var p=findP(u.id),hay=[u.name,u.email,p?fullName(p):''].join(' ').toLowerCase();
+    return q.every(function(w){return hay.indexOf(w)>=0});
+  }).sort(function(a,b){return (b.loeschantrag?1:0)-(a.loeschantrag?1:0)||String(a.name||'').localeCompare(String(b.name||''),'de')});
+}
+function mailGroup(){
+  var g=state.mg,res=[];
+  state.users.forEach(function(u){
+    if(u.rolle!=='bewerber'||u.gesperrt||u.loeschantrag||u.geloescht||!u.email)return;
+    var p=findP(u.id),reg=u.reg||{};
+    if(state.mnews&&!reg.news)return;
+    if(g!=='alle'){var t=p?effTyp(p):[];if(t.indexOf(g)<0)return}
+    res.push(u.email);
+  });
+  return res;
+}
+function fillKonten(){
+  var box=$('#klist');if(!box)return;
+  var list=kontenFiltered(),h='';
+  var n={bew:0,prod:0};state.users.forEach(function(u){if(u.rolle==='bewerber'&&!u.geloescht)n.bew++;else if(u.rolle==='kunde'&&!u.geloescht)n.prod++});
+  h+='<div class="ptabs">'+[['alle','Alle'],['bew','Darsteller ('+n.bew+')'],['prod','Produktionen ('+n.prod+')'],['sperr','Gesperrt'],['antr','Löschanträge ('+loeschAntraege().length+')']].map(function(t){return '<button type="button" class="chip'+(state.kf===t[0]?' on':'')+'" data-act="kf" data-v="'+t[0]+'" aria-pressed="'+(state.kf===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
+  h+=list.length?list.map(kontoRow).join(''):'<div class="empty" style="margin-top:12px"><h3>Keine Konten</h3><p>In dieser Ansicht gibt es nichts zu zeigen.</p></div>';
+  box.innerHTML=h;
+}
+function renderKonten(quiet){
+  var host=$('#v-konten');$('#count').textContent='Konten';
+  if(quiet&&$('#kq')){fillKonten();return}
+  var mails=mailGroup();
+  host.innerHTML='<div class="selfwrap"><h2 style="font-size:28px">Konten</h2><p class="cl" style="margin-top:6px">Hier sperrst und löschst du Darsteller und Produktionen. Beim Sperren eines Darstellers werden seine Fotos gelöscht, der Zugang ist blockiert.</p></div>'+
+    '<div class="pbar"><input type="search" id="kq" style="flex:2 1 220px" placeholder="Suchen: Name oder E-Mail" aria-label="Konten durchsuchen" value="'+esc(state.kq)+'" autocomplete="off"></div><div id="klist"></div>'+
+    '<div class="selfwrap" style="margin-top:16px"><h3>E-Mail-Adressen</h3><p class="cl" style="margin:4px 0 8px">Für Rundmails aus deinem Mailprogramm. Nur Darsteller ohne Sperre und ohne Löschantrag.</p><div class="pbar" style="margin:0"><select id="mgrp" aria-label="Gruppe">'+[['alle','Alle Darsteller'],['Komparse','Komparsen'],['Kleindarsteller','Kleindarsteller'],['Schauspieler','Schauspieler']].map(function(o){return '<option value="'+o[0]+'"'+(state.mg===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></div><label class="consent" style="margin-top:8px"><input type="checkbox" id="mnews"'+(state.mnews?' checked':'')+'><span>Nur mit Einwilligung für Neuigkeiten</span></label><div class="acts" style="margin-top:8px"><button type="button" class="btn" data-act="mcopy" id="mcopy">Adressen kopieren ('+mails.length+')</button></div></div>'+
+    '<div class="selfwrap" style="margin-top:16px"><h3>Sicherung</h3><p class="cl" style="margin:4px 0 8px">Lädt Profile (ohne Fotos), Projekte und Konten als Datei herunter.</p><div class="acts"><button type="button" class="btn" data-act="kbackup">Kartei sichern (JSON)</button></div></div>';
+  fillKonten();
+}
+function refreshMailCount(){var b=$('#mcopy');if(b)b.textContent='Adressen kopieren ('+mailGroup().length+')'}
+async function kontoAction(id,act){
+  var u=state.users.filter(function(x){return x.id===id})[0];if(!u)return;
+  state.kBusy=true;
+  try{
+    if(act==='unlock'){await db.doc('users/'+id).update({gesperrt:false});if(u.rolle==='bewerber'&&findP(id))await db.doc('people/'+id).update({gesperrt:false,loeschantrag:null});await db.doc('users/'+id).update({loeschantrag:null});u.gesperrt=false;u.loeschantrag=null;var up=findP(id);if(up){up.gesperrt=false;up.loeschantrag=null}toast('Konto entsperrt. Der Darsteller muss seine Fotos neu hochladen.')}
+    else if(act==='lock'){
+      await db.doc('users/'+id).update({gesperrt:true});u.gesperrt=true;
+      if(u.rolle==='bewerber'&&findP(id)){await lockPerson(id)}
+      toast('Konto gesperrt')
+    }
+    else if(act==='del'){
+      if(u.rolle==='bewerber'){await erasePerson(id)}
+      else{
+        var kq=await db.collection('kunden/'+id+'/auswahl').get();
+        for(var i=0;i<kq.docs.length;i++)await db.doc('kunden/'+id+'/auswahl/'+kq.docs[i].id).delete();
+      }
+      await db.doc('users/'+id).set({rolle:u.rolle,name:'',email:'',gesperrt:true,geloescht:Date.now(),createdAt:u.createdAt||Date.now()});
+      u.name='';u.email='';u.gesperrt=true;u.geloescht=Date.now();
+      toast('Konto und Daten gelöscht. Den Login selbst kannst du in der Firebase-Konsole unter Authentication entfernen.')
+    }
+  }catch(e){toast('Das hat nicht geklappt. Versuche es noch einmal.')}
+  state.kBusy=false;state.kConfirm=null;updateBadge();fillKonten();
+}
+async function lockPerson(id){
+  try{await deletePhotos(id)}catch(e){}
+  await db.doc('people/'+id).update({gesperrt:true,hasFoto:false,thumb:null,updatedAt:Date.now()});
+  var p=findP(id);if(p){p.gesperrt=true;p.hasFoto=false;p.thumb=null}
+}
+async function erasePerson(id){
+  var p=findP(id);
+  try{if(p&&p.hasFoto)await deletePhotos(id)}catch(e){}
+  try{await db.doc('people/'+id).delete()}catch(e){}
+  try{var bq=await db.collection('buchungen/'+id+'/e').get();for(var i=0;i<bq.docs.length;i++)await db.doc('buchungen/'+id+'/e/'+bq.docs[i].id).delete()}catch(e){}
+  state.projects.forEach(function(pr){if(pr.auswahl&&pr.auswahl[id]){var m=Object.assign({},pr.auswahl);delete m[id];pr.auswahl=m;db.doc('projekte/'+pr.id).update({auswahl:m}).catch(function(){})}});
+}
+function downloadJSON(name,obj){
+  var blob=new Blob([JSON.stringify(obj,null,1)],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+}
+async function backupAll(){
+  var b=$('[data-act="kbackup"]');if(b){b.disabled=true;b.textContent='Wird erstellt …'}
+  try{
+    var people=state.people.map(function(p){var o=Object.assign({},p);delete o.thumb;return o});
+    var users=state.users.map(function(u){return {id:u.id,rolle:u.rolle,name:u.name,email:u.email,freigabe:u.freigabe||null,gesperrt:!!u.gesperrt,loeschantrag:u.loeschantrag||null}});
+    downloadJSON('kartei-sicherung-'+todayStr()+'.json',{erstellt:new Date().toISOString(),profile:people,projekte:state.projects,konten:users});
+  }catch(e){toast('Die Sicherung konnte nicht erstellt werden.')}
+  if(b){b.disabled=false;b.textContent='Kartei sichern (JSON)'}
+}
+
 /* ---------- Zu prüfen (Admin) ---------- */
 function pendingList(){return {p:state.people.filter(function(x){return x.freigabe==='neu'}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)}),u:state.users.filter(function(x){return x.rolle==='kunde'&&x.freigabe==='offen'})}}
-function updateBadge(){var n=pendingList(),c=n.p.length+n.u.length,b=$('#pbadge');if(b){b.textContent=c;b.hidden=!c}}
+function loeschAntraege(){return state.users.filter(function(u){return u.loeschantrag&&!u.geloescht&&u.rolle!=='admin'})}
+function updateBadge(){var n=pendingList(),c=n.p.length+n.u.length,b=$('#pbadge');if(b){b.textContent=c;b.hidden=!c}var k=loeschAntraege().length,kb=$('#kbadge');if(kb){kb.textContent=k;kb.hidden=!k}}
 function renderPruef(){
   var host=$('#v-pruef');$('#count').textContent='Zu prüfen';
   var n=pendingList(),h='<div class="selfwrap"><h2 style="font-size:28px">Zu prüfen</h2>';
@@ -1440,7 +1653,7 @@ async function renderSelf(note){
   var rg=ctx.reg||{},pre={einwilligung:!!rg.einwilligung,email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
   if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
   state.selfBase=p||pre;
-  var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':p&&p.freigabe==='ok'?'<p class="okmsg" role="status">Dein Profil ist freigegeben.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>';
+  var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':'Trage deine Daten und Fotos ein, damit die Agentur dich für Projekte vorschlagen kann. Alle Felder außer Name, Kategorie und Einwilligung sind freiwillig, je genauer, desto besser wirst du gefunden.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':p&&p.freigabe==='ok'?'<p class="okmsg" role="status">Dein Profil ist freigegeben.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>'+kontoHTML();
   host.innerHTML=h;
   if(p&&p.hasFoto){state.photoLoad=loadPhotos(p).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}
 }
@@ -1470,6 +1683,7 @@ async function saveSelf(){
     rec.einwilligungDatum=(old&&old.einwilligungDatum)||new Date().toISOString().slice(0,10);
     var cs=state.cal&&state.cal.set?state.cal.set:new Set(),t=todayStr();
     rec.verfDates=Array.from(cs).filter(function(x){return x>=t}).sort();
+    if(!old||String((old.verfDates||[]).join())!==String(rec.verfDates.join()))rec.kalenderAt=Date.now();
     if(state.photoLoad){try{await state.photoLoad}catch(e){}}
     var hasPh=ALLSLOTS.some(function(sl){var ed=state.photoEdits[sl.k];return ed?!!ed.full:!!state.photoDocs[sl.k]});
     if(!hasPh&&old&&old.hasFoto&&!Object.keys(state.photoDocs).length&&!Object.keys(state.photoEdits).some(function(x){return state.photoEdits[x].remove}))hasPh=true;
@@ -1586,6 +1800,8 @@ function projDay(pr,tab){
   if(tab==='abg')return d[d.length-1];
   var t=todayStr(),n=d.filter(function(x){return x>=t})[0];return n||d[0];
 }
+function neueAntwort(pr){return !!pr.kundeAntwortAt&&pr.kundeAntwortAt>(pr.adminGesehenAt||0)}
+function updateProjDot(){var el=$('#pdot');if(el)el.hidden=!state.projects.some(neueAntwort)}
 function projCardHTML(pr){
   var tg=tageStr(pr.tage),sel=pr.auswahl||{},ids=Object.keys(sel),sent=ids.filter(function(i){return sel[i].st&&sel[i].st!=='auswahl'}).length,draft=ids.length-sent;
   var roles=pr.rollen||[],need=0,have=0;roles.forEach(function(r){var n=+r.anzahl||1;need+=n;have+=Math.min(n,bookedCount(pr,r))});
@@ -1593,7 +1809,8 @@ function projCardHTML(pr){
   var tags='';
   if(roles.length)tags+='<span class="pill">Besetzt '+have+' von '+need+'</span> ';
   if(sent)tags+='<span class="cl">'+sent+' Profil'+(sent===1?'':'e')+' beim Kunden</span> ';
-  if(draft)tags+='<span class="cl">'+draft+' in Auswahl</span>';
+  if(draft)tags+='<span class="cl">'+draft+' in Auswahl</span> ';
+  if(neueAntwort(pr))tags+='<span class="pill" style="background:var(--ink);color:var(--bg)">Neue Antwort vom Kunden</span>';
   return '<button type="button" class="pj" data-act="popen" data-id="'+esc(pr.id)+'"><h3>'+esc(pr.name||'Ohne Namen')+'</h3>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+'<div class="cl">'+(tg?esc(tg):'Noch keine Drehtage')+'</div>'+(tags?'<div style="margin-top:6px">'+tags+'</div>':'')+'</button>';
 }
 function fillPList(){
@@ -1663,7 +1880,7 @@ function renderProjDetail(){
   Object.keys(groups).forEach(function(k){groups[k].sort(function(x,y){return (y.a&&x.a?y.a.free-x.a.free:0)||byName(x,y)})});
   var selIds=Object.keys(sel).filter(function(id){return findP(id)}),nOpen=selIds.filter(function(id){return sel[id].st==='auswahl'}).length;
   if(selIds.length){
-    h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Trage unter „Bearbeiten“ die Kunden-ID ein, um die Auswahl zu senden.</span>')+'</div><div class="grid">'+selIds.map(function(id){
+    h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Wähle unter „Bearbeiten“ den Kunden aus, um die Auswahl zu senden.</span>')+'</div><div class="grid">'+selIds.map(function(id){
       var p=findP(id),st=effSt(pr,id);
       return '<div class="mwrap">'+cardHTML(p,statTag(st)+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':''))+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
     }).join('')+'</div>';
@@ -1695,10 +1912,16 @@ function projToDraft(pr){
   ((pr&&pr.rollen)||[]).forEach(function(r){var o={id:r.id};ROLEF.forEach(function(f){var v=r[f.k];o[f.k]=f.t==='list'?(v||[]).join(', '):(v==null?'':String(v))});d.rollen.push(o)});
   return d;
 }
+function kundenOptions(cur){
+  var ks=state.users.filter(function(u){return u.rolle==='kunde'&&(!u.freigabe||u.freigabe==='ok')&&!u.gesperrt&&!u.geloescht});
+  if(cur&&!ks.some(function(u){return u.id===cur}))ks.push({id:cur,name:'Konto '+cur,email:''});
+  ks.sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'de')});
+  return '<option value="">– kein Kunde –</option>'+ks.map(function(u){return '<option value="'+esc(u.id)+'"'+(u.id===cur?' selected':'')+'>'+esc((u.name||'Ohne Namen')+(u.email?' ('+u.email+')':''))+'</option>'}).join('');
+}
 function projFormHTML(d){
   var h='<form id="pform" novalidate><div class="sh"><h2 id="sheetTitle">'+(d.id?'Projekt bearbeiten':'Neues Projekt')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>';
   h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Projektname'+(isAdmin?'':' *')+'</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-prod">Produktion, Kunde'+(isAdmin?'':' *')+'</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div><div class="fld"><label for="p-art">Was wird gedreht'+(isAdmin?'':' *')+'</label><input id="p-art" data-pf="art" value="'+esc(d.art)+'" autocomplete="off" placeholder="z. B. Kinofilm, Serie, Werbung"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
-  h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie'+(isAdmin?'':' *')+'</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie'+(isAdmin?'':' *')+'</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie'+(isAdmin?'':' *')+'</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunden-ID <span class="hint">wird bei Kundenprojekten automatisch gesetzt</span></label><input id="p-kid" data-pf="kundeId" value="'+esc(d.kundeId)+'" autocomplete="off"></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' <span class="hint">sehen auch Bewerber</span>':' *')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
+  h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie'+(isAdmin?'':' *')+'</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie'+(isAdmin?'':' *')+'</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie'+(isAdmin?'':' *')+'</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunde (Konto) <span class="hint">nötig, um die Auswahl zu senden</span></label><select id="p-kid" data-pf="kundeId">'+kundenOptions(d.kundeId)+'</select></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' <span class="hint">sehen auch Bewerber</span>':' *')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
   h+='<fieldset><legend>Drehtage</legend>'+d.tage.map(function(t,i){return '<div class="drow"><div class="fld"><label for="pt-v'+i+'">Von</label><input type="date" id="pt-v'+i+'" data-pt="'+i+'" data-k="von" value="'+esc(t.von)+'"></div><div class="fld"><label for="pt-b'+i+'">Bis <span class="hint">leer = ein Tag</span></label><input type="date" id="pt-b'+i+'" data-pt="'+i+'" data-k="bis" value="'+esc(t.bis)+'"></div><button type="button" class="btn small" data-act="ptdel" data-i="'+i+'" aria-label="Zeitraum entfernen">Entfernen</button></div>'}).join('')+'<button type="button" class="btn small" data-act="ptadd">Weiterer Zeitraum</button></fieldset>';
   h+='<fieldset><legend>Rollen und Anforderungen</legend><p class="cl" style="margin:0 0 10px">Leere Felder bedeuten: egal. Beim Alter wird das Spielalter geprüft.</p>'+d.rollen.map(function(r,i){
     return '<div class="edrow"><div class="cols wide">'+ROLEF.map(function(f){
@@ -1757,6 +1980,9 @@ async function saveProj(){
     if(d.ort.trim())rec.ort=d.ort.trim();
     if(d.oeffentlich)rec.oeffentlich=true;
     if(old&&old.auswahl)rec.auswahl=old.auswahl;
+    if(old&&old.kundeAntwortAt)rec.kundeAntwortAt=old.kundeAntwortAt;
+    if(old&&old.adminGesehenAt)rec.adminGesehenAt=old.adminGesehenAt;
+    if(isAdmin&&rec.kundeId&&!(old&&old.erstellerName)){var ku=state.users.filter(function(u){return u.id===rec.kundeId})[0];if(ku&&ku.name)rec.erstellerName=ku.name}
     if(role==='kunde'){rec.ersteller=uid;rec.kundeId=uid;rec.erstellerName=myName||myEmail;delete rec.oeffentlich;if(old&&old.oeffentlich)rec.oeffentlich=true}
     else if(old&&old.ersteller){rec.ersteller=old.ersteller;if(old.erstellerName)rec.erstellerName=old.erstellerName}
     await ref.set(rec);
@@ -1850,7 +2076,7 @@ async function sendSel(){
       try{ph=await loadPhotos(p)}catch(e){}
       var fotos=[];
       ['portrait','ganzkoerper','profil'].forEach(function(k){if(ph[k]){fotos.push({l:(ALLSLOTS.filter(function(s){return s.k===k})[0]||{}).l||k,src:ph[k].data||ph[k].thumb})}});
-      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',link:safeUrl(p.link),fotos:fotos};
+      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',link:safeUrl(p.link),link2:safeUrl(p.link2),fotos:fotos};
       while(JSON.stringify(snap).length>220000&&snap.fotos.length)snap.fotos.pop();
       await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',snap:snap,sentAt:Date.now()});
       m[p.id]=Object.assign({},m[p.id],{st:'gesendet',sentAt:Date.now()});
@@ -1899,13 +2125,14 @@ async function renderKunde(){
     });
     h+='</div>';
   });
+  h+=kontoHTML();
   host.innerHTML=h;
 }
 async function kDecide(key,s){
   var d=state.kdocs&&state.kdocs[key];if(!d)return;
   var ns=d.status===s?'offen':s;
   d.status=ns;
-  try{await db.doc('kunden/'+uid+'/auswahl/'+key).update({status:ns,decidedAt:Date.now()});toast(ns==='bestaetigt'?'Bestätigt':ns==='abgelehnt'?'Abgelehnt':'Entscheidung zurückgenommen')}
+  try{await db.doc('kunden/'+uid+'/auswahl/'+key).update({status:ns,decidedAt:Date.now()});if(d.projId)db.doc('projekte/'+d.projId).update({kundeAntwortAt:Date.now()}).catch(function(){});toast(ns==='bestaetigt'?'Bestätigt':ns==='abgelehnt'?'Abgelehnt':'Entscheidung zurückgenommen')}
   catch(e){toast('Speichern hat nicht geklappt.')}
   renderKunde();
 }
@@ -1916,30 +2143,59 @@ function kZoom(key){
   if(!items.length)return;
   state.gallery=items;state.detailLoad=null;$('#lb').hidden=false;showGal(0);
 }
+var BK_SINCE=1792627200000;
+function bookingNew(b){return !(b.gesehen&&b.gesehen.buchung)&&(b.at||0)>BK_SINCE}
+function unreadCount(arr){var n=0;(arr||[]).forEach(function(b){if(bookingNew(b))n++;(b.dispos||[]).forEach(function(d){if(!(b.gesehen&&b.gesehen[d.id]))n++})});return n}
+function updateBuchDot(){var el=$('#bdot');if(el)el.hidden=!unreadCount(state.bk)}
+function watchBuch(){
+  if(!db||!uid||isAdmin||role==='kunde')return;
+  try{
+    db.collection('buchungen/'+uid+'/e').onSnapshot(function(snap){
+      state.bk=snap.docs.map(function(d){return Object.assign({},d.data()||{},{projId:(d.data()||{}).projId||d.id})});
+      updateBuchDot();
+      if(state.view==='buch'&&state.bkReady)renderBuch(true);
+    },function(){});
+  }catch(e){}
+}
 async function loadBuchungen(){
   var arr=[];
-  try{var qs=await db.collection('buchungen/'+uid+'/e').get();arr=qs.docs.map(function(d){return d.data()||{}})}catch(e){}
+  try{var qs=await db.collection('buchungen/'+uid+'/e').get();arr=qs.docs.map(function(d){return Object.assign({},d.data()||{},{projId:(d.data()||{}).projId||d.id})});state.bk=arr;updateBuchDot()}catch(e){}
+  state.bkReady=true;
   arr.sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
   var h='<div class="selfwrap"><h2 style="font-size:26px">Deine Buchungen</h2>';
   if(!arr.length)return h+'<p class="cl" style="margin:4px 0 0">Noch keine Buchungen. Die Agentur meldet sich per E-Mail bei dir.</p></div>';
-  var out=h+'<div class="rolegrid" style="margin-top:12px">'+arr.map(function(b){
+  var open=state.msgOpen||{};
+  var freshL=arr.filter(bookingNew);
+  setTimeout(function(){if(state.view!=='buch')return;freshL.forEach(function(b){var g=Object.assign({},b.gesehen||{});g.buchung=Date.now();b.gesehen=g;db.doc('buchungen/'+uid+'/e/'+b.projId).update({gesehen:g}).catch(function(){})});updateBuchDot()},1500);
+  return h+'<div class="rolegrid" style="margin-top:12px">'+arr.map(function(b){
     var ds=(b.dispos||[]).slice().sort(function(x,y){return y.at-x.at}),g=b.gesehen||{};
-    var dh=ds.map(function(d){var nw=!g[d.id],dt=new Date(d.at);return '<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px"><span class="pill">Dispo</span>'+(nw?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+' <b>'+esc(d.betreff||'Dispo')+'</b><div class="cl">'+esc(dt.toLocaleDateString('de-DE'))+'</div><div class="notes" style="white-space:pre-wrap;margin-top:4px">'+esc(d.text||'')+'</div></div>'}).join('');
-    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht.'+(ds.length?'':' Weitere Infos bekommst du per E-Mail.')+'</div>'+dh+'</div>';
+    var dh=ds.map(function(d){
+      var nw=!g[d.id],dt=new Date(d.at),op=!!open[d.id];
+      return '<div class="msg'+(nw?' new':'')+'"><button type="button" class="msgh" data-act="msg" data-p="'+esc(b.projId)+'" data-d="'+esc(d.id)+'" aria-expanded="'+op+'">'+(nw?'<span class="dot" aria-hidden="true"></span>':'')+'<span class="mt">'+(nw?'<span class="pill">Neu</span> ':'')+'Dispo: '+esc((d.betreff||'Dispo').replace(/^Dispo:\s*/i,''))+'</span><span class="cl">'+esc(dt.toLocaleDateString('de-DE'))+'</span></button><div class="msgb" id="m-'+esc(d.id)+'"'+(op?'':' hidden')+'>'+esc(d.text||'')+'</div></div>';
+    }).join('');
+    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(bookingNew(b)?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht.'+(ds.length?'':' Weitere Infos bekommst du per E-Mail.')+'</div>'+dh+'</div>';
   }).join('')+'</div></div>';
-  arr.forEach(function(b){
-    var ds=b.dispos||[];if(!ds.length||!b.projId)return;
-    var g=Object.assign({},b.gesehen||{}),ch=false;
-    ds.forEach(function(d){if(!g[d.id]){g[d.id]=Date.now();ch=true}});
-    if(ch)db.doc('buchungen/'+uid+'/e/'+b.projId).update({gesehen:g}).catch(function(){});
-  });
-  return out;
 }
-async function renderBuch(){
+function toggleMsg(pid,did){
+  state.msgOpen=state.msgOpen||{};
+  var body=$('#m-'+did),row=body?body.parentNode:null,btn=row?row.querySelector('.msgh'):null;
+  if(!body)return;
+  var opening=body.hidden;
+  body.hidden=!opening;if(btn)btn.setAttribute('aria-expanded',String(opening));
+  if(opening)state.msgOpen[did]=true;else delete state.msgOpen[did];
+  if(!opening)return;
+  var b=(state.bk||[]).filter(function(x){return x.projId===pid})[0];
+  if(!b||(b.gesehen&&b.gesehen[did]))return;
+  var g=Object.assign({},b.gesehen||{});g[did]=Date.now();b.gesehen=g;
+  if(row){row.classList.remove('new');var dt=row.querySelector('.dot');if(dt)dt.remove();var pl=row.querySelector('.mt .pill');if(pl)pl.remove()}
+  updateBuchDot();
+  db.doc('buchungen/'+uid+'/e/'+pid).update({gesehen:g}).catch(function(){});
+}
+async function renderBuch(quiet){
   var host=$('#v-buch');
   $('#count').textContent='Anfragen und Buchungen';
   if(!db||state.nodb||!uid){host.innerHTML='<div class="selfwrap"><h2>Keine Verbindung</h2><p class="cl">Die Verbindung zur Datenbank ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';return}
-  host.innerHTML='<div class="selfwrap"><p class="cl">Wird geladen …</p></div>';
+  if(!quiet)host.innerHTML='<div class="selfwrap"><p class="cl">Wird geladen …</p></div>';
   var bk=await loadBuchungen(),anf=await loadAnfragen();
   if(state.view!=='buch')return;
   host.innerHTML=bk+(anf||'<div class="selfwrap"><h2 style="font-size:26px">Aktuelle Anfragen</h2><p class="cl" style="margin:4px 0 0">Gerade gibt es keine offenen Anfragen.</p></div>');
@@ -1980,16 +2236,19 @@ async function start(){
     db.collection('users').onSnapshot(function(snap){
       state.users=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
       updateBadge();if(state.view==='pruef'&&$('#scrim').hidden)renderPruef();
+      if(state.view==='konten'&&$('#scrim').hidden&&!state.kBusy)renderKonten(true);
     },function(){});
     db.collection('people').onSnapshot(function(snap){
       state.people=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
       state.loaded=true;updateBadge();
+      if(state.view==='konten'&&$('#scrim').hidden&&!state.kBusy)renderKonten(true);
       if(state.view==='pruef'&&$('#scrim').hidden)renderPruef();
       if(state.view==='kartei'){renderList();refreshPanel(false)}
       else if(state.view==='proj'&&$('#scrim').hidden)renderProj();
     },function(){state.nodb=true;renderList()});
     db.collection('projekte').onSnapshot(function(snap){
       state.projects=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
+      updateProjDot();
       if(state.view==='proj'&&$('#scrim').hidden)renderProj();
     },function(){});
   }else if(role==='kunde'){
@@ -2001,6 +2260,7 @@ async function start(){
     },function(){state.nodb=true;renderKunde()});
   }else{
     state.loaded=true;
+    watchBuch();
     setView('self');
   }
 }
@@ -2073,7 +2333,7 @@ async function renderAuth(msg, ok) {
         ? '<div class="fld"><label for="a-name">Name der Ansprechperson</label><input id="a-name" autocomplete="name"></div>'
         : '<div class="fld"><label for="a-vn">Vorname</label><input id="a-vn" autocomplete="given-name"></div><div class="fld"><label for="a-nn">Nachname</label><input id="a-nn" autocomplete="family-name"></div>';
     }
-    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>' + (step2 ? '<div class="fld"><label for="a-pw2">Passwort wiederholen</label><input id="a-pw2" type="password" autocomplete="new-password"></div>' : '') + (step2 && !prod ? '<label class="consent" style="margin-top:12px"><input type="checkbox" id="a-einw"><span>Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann mein Profil jederzeit ändern oder löschen.</span></label>' : '');
+    h += '<div class="fld"><label for="a-mail">E-Mail</label><input id="a-mail" type="email" inputmode="email" autocomplete="email"></div><div class="fld"><label for="a-pw">Passwort</label><input id="a-pw" type="password" autocomplete="' + (step2 ? 'new-password' : 'current-password') + '"></div>' + (step2 ? '<div class="fld"><label for="a-pw2">Passwort wiederholen</label><input id="a-pw2" type="password" autocomplete="new-password"></div>' : '') + (step2 && !prod ? '<label class="consent" style="margin-top:12px"><input type="checkbox" id="a-news"><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label><label class="consent" style="margin-top:12px"><input type="checkbox" id="a-einw"><span>Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann mein Profil jederzeit ändern oder löschen.</span></label>' : '');
     h += '<div class="ferr" id="aerr" role="alert">' + (ok ? '' : esc(msg || '')) + '</div>' + (ok ? '<div class="okmsg" role="status">' + esc(msg) + '</div>' : '');
     h += '<div class="acts" style="margin-top:6px;border:0;padding:0"><button type="submit" class="btn primary" id="abtn">' + (step2 ? 'Konto anlegen' : 'Anmelden') + '</button>' + (step2 ? '' : '<button type="button" class="btn" id="areset">Passwort vergessen</button>') + '</div></form>';
   }
@@ -2127,8 +2387,9 @@ document.addEventListener('submit', async (e) => {
       else { vn = $('#a-vn').value.trim(); nn = $('#a-nn').value.trim(); name = (vn + ' ' + nn).trim(); }
       if (prod ? !name : !vn || !nn) { err.textContent = prod ? 'Trage den Namen der Ansprechperson ein.' : 'Trage Vorname und Nachname ein.'; btn.disabled = false; return; }
       if (!prod && !($('#a-einw') || {}).checked) { err.textContent = 'Ohne deine Einwilligung zur Datenverarbeitung können wir dich nicht eintragen.'; btn.disabled = false; return; }
+      if (pw.length < 8) { err.textContent = 'Das Passwort ist zu kurz. Nimm mindestens 8 Zeichen.'; btn.disabled = false; return; }
       if (pw !== $('#a-pw2').value) { err.textContent = 'Die beiden Passwörter stimmen nicht überein.'; btn.disabled = false; return; }
-      const rg = prod ? null : Object.assign(buildReg(), { vorname: vn, nachname: nn, einwilligung: true });
+      const rg = prod ? null : Object.assign(buildReg(), { vorname: vn, nachname: nn, einwilligung: true, news: !!($('#a-news') || {}).checked });
       await be.register(mail, pw, name, prod ? 'kunde' : 'bewerber', rg);
       if (be.mode === 'local') location.reload();
     } else {
@@ -2144,6 +2405,11 @@ function renderWait(info) {
   $('#auth').hidden = false; $('#app').hidden = true;
 }
 
+function renderBlocked(info) {
+  $('#auth').innerHTML = '<div class="auth"><img class="logo-big" src="' + LOGO + '" alt="Logo"><h1>Casting-Kartei</h1><div class="card2"><h2 style="font-size:22px;margin:0 0 8px">' + (info.geloescht ? 'Konto gelöscht' : 'Konto gesperrt') + '</h2><p class="cl">' + (info.geloescht ? 'Dieses Konto und die zugehörigen Daten wurden gelöscht.' : 'Der Zugang zu diesem Konto ist gesperrt. Wende dich bei Fragen an die Agentur.') + '</p><div class="acts" style="border:0;padding:0;margin-top:12px"><button type="button" class="btn" data-act="logout">Abmelden</button></div></div></div>';
+  $('#auth').hidden = false; $('#app').hidden = true;
+}
+
 async function boot() {
   try { be = await createBackend(); } catch (e) {
     $('#auth').innerHTML = '<div class="auth"><h1>Casting-Kartei</h1><p class="ferr">Die Verbindung zum Server ist fehlgeschlagen. Prüfe dein Internet und lade die Seite neu.</p></div>';
@@ -2152,11 +2418,12 @@ async function boot() {
   be.onAuth((info) => {
     if (!info) { if (started) location.reload(); else renderAuth(); return; }
     if (!info.role) { renderAuth('Zu diesem Konto fehlt die Rolle. Bitte melde dich ab und registriere dich neu.'); be.signOut(); return; }
+    if (info.gesperrt) { renderBlocked(info); return; }
     if (info.role === 'kunde' && info.freigabe && info.freigabe !== 'ok') { renderWait(info); return; }
     if (started) return;
     started = true;
     $('#auth').hidden = true; $('#app').hidden = false;
-    runApp({ db: be.db, role: info.role, uid: info.uid, name: info.name, email: info.email, reg: info.reg, deleteAccount: be.deleteAccount, mode: be.mode });
+    runApp({ db: be.db, role: info.role, uid: info.uid, name: info.name, email: info.email, reg: info.reg, deleteAccount: be.deleteAccount, changePassword: be.changePassword, loeschantrag: info.loeschantrag, mode: be.mode });
   });
 }
 boot();
