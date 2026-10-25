@@ -250,9 +250,10 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .pth.add .ph{opacity:1}
 .appfoot{padding:0 16px 24px;max-width:960px;margin:24px auto 0}
 
-/* Auswahlfelder im Profilformular: kleiner und in der Akzentfarbe */
-#form .chips{gap:5px}
-#form .chip{padding:3px 10px;font-size:12.5px;min-height:28px}
+/* Auswahlfelder im Profilformular: klein, eng und in der Akzentfarbe */
+#form .chips{gap:4px}
+#form .chip.chk{padding:0;min-height:0;border:0}
+#form .chk span{padding:2px 9px;min-height:24px;font-size:12px;letter-spacing:.03em}
 #form .chk input:checked+span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 
 </style>
@@ -1051,7 +1052,7 @@ function formHTML(p,self){
     '<div class="fld" style="margin-top:12px"><div class="fl">Fertigkeiten</div>'+checks('fertigkeiten',optsFor(gSk),p.fertigkeiten||[])+'</div>'+
     '<div class="fld" style="margin-top:8px"><label for="f-skillsx">Weitere Fertigkeiten, durch Komma getrennt</label><input id="f-skillsx" autocomplete="off"></div>'+
     '<div class="fld" style="margin-top:12px"><div class="fl">Führerschein</div>'+checks('fuehrerschein',optsFor(gFs),p.fuehrerschein||[])+'</div>'+
-    (self&&hasSch(p)?'':'<div class="fld" style="margin-top:12px"><div class="fl">Rollenerfahrung</div><label class="consent"><input type="checkbox" id="f-tages"'+(p.tagesrollen?' checked':'')+'><span>Ich habe Erfahrung mit Tagesrollen (ohne Text)</span></label><label class="consent" style="margin-top:6px"><input type="checkbox" id="f-sprech"'+(p.sprechrollen?' checked':'')+'><span>Ich habe Erfahrung mit Textrollen</span></label></div>')+
+    (self&&hasSch(p)?'':'<div class="fld" style="margin-top:12px"><div class="fl">Rollenerfahrung</div><div class="chips"><label class="chip chk"><input type="checkbox" id="f-tages"'+(p.tagesrollen?' checked':'')+'><span>Tagesrollen (ohne Text)</span></label><label class="chip chk"><input type="checkbox" id="f-sprech"'+(p.sprechrollen?' checked':'')+'><span>Textrollen</span></label></div></div>')+
     '<div class="fld" style="margin-top:12px"><label for="f-erfahrung">Erfahrung</label><textarea id="f-erfahrung">'+esc(p.erfahrung)+'</textarea></div>'+
     '<div class="fld" id="lnkfld" style="margin-top:12px"><label for="f-link">'+(self&&baseKat(p)==='kd'?'Link zum Vorstellungsvideo *':'Link zu Vorstellungsvideo, Homepage oder externem Profil (optional)')+'</label><input id="f-link" type="text" inputmode="url" autocomplete="off" placeholder="z. B. vimeo.com/… oder meine-seite.de" value="'+esc(p.link||'')+'"></div><div class="fld" id="lnk2fld" style="margin-top:12px"><label for="f-link2">Weiteres Video oder Profil (optional)</label><input id="f-link2" type="text" inputmode="url" autocomplete="off" placeholder="z. B. youtube.com/…" value="'+esc(p.link2||'')+'"></div></fieldset>';
   h+='<fieldset><legend>'+(self?'Kontakt':'Kontakt und Konditionen')+'</legend><div class="cols wide">'+
@@ -1671,7 +1672,7 @@ function kontoHTML(){
   if(isB)h+='<div style="font-weight:700;font-size:17px;margin-bottom:8px">Newsletter</div><label class="consent" style="margin-top:0"><input type="checkbox" id="k-news"'+(news?' checked':'')+'><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label>';
   h+='<div style="font-weight:700;font-size:17px;margin:'+(isB?'32px':'8px')+' 0 12px">Passwort ändern</div><div style="max-width:420px"><div class="fld" style="margin-bottom:22px"><label for="kp-o">Aktuelles Passwort</label><input id="kp-o" type="password" autocomplete="current-password"></div><div class="fld" style="margin-bottom:12px"><label for="kp-n">Neues Passwort</label><input id="kp-n" type="password" autocomplete="new-password"></div><div class="fld"><label for="kp-n2">Neues Passwort wiederholen</label><input id="kp-n2" type="password" autocomplete="new-password"></div></div><div class="ferr" id="kp-err" role="alert"></div><div class="acts" style="border:0;padding:0;margin-top:6px"><button type="button" class="btn primary" data-act="kpw">Passwort ändern</button></div>';
   if(isB&&(ctx.reg||{}).einwilligung)h+='<div style="font-weight:700;font-size:17px;margin:32px 0 8px">Datenschutz</div><p class="cl" style="margin:0">Bei der Registrierung hast du eingewilligt, dass die Agentur deine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Du kannst dein Profil jederzeit ändern oder löschen.</p>';
-  h+='<div class="fl" style="margin-top:36px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
+  h+='<div style="font-weight:700;font-size:17px;margin:32px 0 8px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
   return h;
 }
 async function changePw(){
@@ -2728,7 +2729,7 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-const APP_VERSION = '1.8.24 (25.10.2026)';
+const APP_VERSION = '1.8.26 (25.10.2026)';
 (function(){var e=document.getElementById('appver');if(e)e.textContent='Version '+APP_VERSION;})();
 let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
