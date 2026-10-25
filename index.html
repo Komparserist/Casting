@@ -250,6 +250,11 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .pth.add .ph{opacity:1}
 .appfoot{padding:0 16px 24px;max-width:960px;margin:24px auto 0}
 
+/* Auswahlfelder im Profilformular: kleiner und in der Akzentfarbe */
+#form .chips{gap:5px}
+#form .chip{padding:3px 10px;font-size:12.5px;min-height:28px}
+#form .chk input:checked+span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
 </style>
 </head>
 <body>
@@ -1024,14 +1029,14 @@ function formHTML(p,self){
   var gSk=GROUPS.filter(function(g){return g.k==='fertigkeiten'})[0];
   var gFs=GROUPS.filter(function(g){return g.k==='fuehrerschein'})[0];
   var h='<form id="form" novalidate'+(self?' data-self="1"':'')+'>'+(self?'':'<div class="sh"><h2 id="sheetTitle">'+(isNew?'Neues Profil':'Profil bearbeiten')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>');
-  h+='<fieldset><legend>Person</legend><div class="cols">'+
+  h+='<fieldset id="fs-person"><legend>Person</legend><div class="cols">'+
     inp('f-vorname','Vorname'+(self?' *':''),p.vorname,'autocomplete="off" data-first')+inp('f-nachname','Nachname'+(self?' *':''),p.nachname,'autocomplete="off"')+
     sel('f-geschlecht','Geschlecht'+(self?' *':''),GESCHLECHT,p.geschlecht)+
     '<div class="fld"><label for="f-geburtsdatum">Geburtsdatum'+(self?' *':'')+'</label><input id="f-geburtsdatum" type="date" min="1900-01-01" max="'+todayStr()+'" value="'+esc(p.geburtsdatum||'')+'" data-jahr="'+esc(p.geburtsjahr||'')+'" autocomplete="bday"></div>'+
     (self?'':inp('f-agentur','Vermittelt über',p.agentur,'autocomplete="off" placeholder="optional"'))+
-    '</div><div style="margin-top:12px">'+inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+'</div><div class="plzrow">'+inp('f-plz','PLZ'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off" data-plz-ort="f-ort" data-plz-msg="f-plzmsg"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off" data-plz-from="f-plz"')+'</div><div class="cl" id="f-plzmsg" role="status" style="margin-top:4px"></div>'+typBlock(p,self)+
-    '<div class="fld" id="pfld" style="margin-top:12px"><div class="fl">Fotos</div><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
-  h+='<fieldset><legend>Aussehen und Maße</legend><div class="cols">'+
+    '</div><div style="margin-top:12px">'+inp('f-strasse','Straße und Hausnummer'+(self?' *':''),p.strasse,'autocomplete="street-address"')+'</div><div class="plzrow">'+inp('f-plz','PLZ'+(self?' *':''),p.plz,'inputmode="numeric" maxlength="5" autocomplete="off" data-plz-ort="f-ort" data-plz-msg="f-plzmsg"')+inp('f-ort','Wohnort'+(self?' *':''),p.ort,'autocomplete="off" data-plz-from="f-plz"')+'</div><div class="cl" id="f-plzmsg" role="status" style="margin-top:4px"></div>'+typBlock(p,self)+'</fieldset>';
+  h+='<fieldset id="fs-fotos"><legend>Fotos</legend><div class="fld" id="pfld"><div class="pgrid" id="pgrid">'+photoGridHTML()+'</div><div class="cl" id="pstat" style="margin-top:6px" role="status">Bilder werden verkleinert gespeichert.</div></div></fieldset>';
+  h+='<fieldset id="fs-aus"><legend>Aussehen und Maße</legend><div class="cols">'+
     inp('f-groesse','Größe (cm)'+(self?' *':''),p.groesse,'inputmode="numeric"')+inp('f-gewicht','Gewicht (kg)',p.gewicht,'inputmode="numeric"')+
     konfHTML(p.konfektion,self,p.geschlecht)+inp('f-schuh','Schuhgröße (EU)'+(self?' *':''),p.schuh,'inputmode="decimal"')+
     sel('f-haarfarbe','Haarfarbe'+(self?' *':''),HAARFARBE,p.haarfarbe)+sel('f-haarlaenge','Haarlänge',HAARLAENGE,p.haarlaenge)+
@@ -1039,10 +1044,10 @@ function formHTML(p,self){
     sel('f-tattoos','Tattoos',TATTOOS,p.tattoos)+
     '<div id="spielfld" class="cols" style="grid-column:1/-1"'+(hasSch(p)?'':' hidden')+'>'+inp('f-spielvon','Spielalter von',p.spielVon,'inputmode="numeric"')+inp('f-spielbis','Spielalter bis',p.spielBis,'inputmode="numeric"')+'</div>'+
     '</div><label class="consent" style="margin-top:12px"><input type="checkbox" id="f-brille"'+(p.brille?' checked':'')+'><span>Trägt eine Brille</span></label></fieldset>';
-  h+='<fieldset><legend>Fähigkeiten und Erfahrung</legend>'+
+  h+='<fieldset id="fs-koen"><legend>Fähigkeiten und Erfahrung</legend>'+
     '<div class="fld"><div class="fl">Sprachen</div>'+checks('sprachen',optsFor(gSp),p.sprachen||[])+'</div>'+
     '<div class="fld" style="margin-top:8px">'+'<label for="f-sprachenx">Weitere Sprachen, durch Komma getrennt</label><input id="f-sprachenx" autocomplete="off"></div>'+
-    inp('f-dialekte','Dialekte',p.dialekte,'autocomplete="off" style="margin-top:0"')+
+    '<div style="margin-top:14px">'+inp('f-dialekte','Dialekte',p.dialekte,'autocomplete="off"')+'</div>'+
     '<div class="fld" style="margin-top:12px"><div class="fl">Fertigkeiten</div>'+checks('fertigkeiten',optsFor(gSk),p.fertigkeiten||[])+'</div>'+
     '<div class="fld" style="margin-top:8px"><label for="f-skillsx">Weitere Fertigkeiten, durch Komma getrennt</label><input id="f-skillsx" autocomplete="off"></div>'+
     '<div class="fld" style="margin-top:12px"><div class="fl">Führerschein</div>'+checks('fuehrerschein',optsFor(gFs),p.fuehrerschein||[])+'</div>'+
@@ -1053,8 +1058,8 @@ function formHTML(p,self){
     inp('f-telefon','Telefon'+(self?' *':''),p.telefon,'type="text" inputmode="tel" autocomplete="off"')+inp('f-email','E-Mail',self?(myEmail||p.email):p.email,'type="text" inputmode="email" autocomplete="off"'+(self?' readonly':''))+inp('f-instagram','Instagram',p.instagram,'autocomplete="off" placeholder="@name oder Link"')+inp('f-social','Weitere Social-Media-Links, Website',p.social,'autocomplete="off" placeholder="TikTok, Facebook, Showreel …"')+
     (self?'':'<div id="gagefld"'+(hasSch(p)?'':' hidden')+'>'+inp('f-gage','Tagesgage (€), nur Schauspieler',p.gage,'inputmode="decimal"')+'<p class="cl" style="margin:4px 0 0">Nur intern. Die Gage kann mit jedem Projekt neu verhandelt werden.</p></div>')+'</div>'+
     (self?'<p class="cl" style="margin:8px 0 0">Deine Kontaktdaten sieht nur die Agentur.</p>':'<div class="fld" style="margin-top:12px"><label for="f-notizen">Notizen</label><textarea id="f-notizen">'+esc(p.notizen)+'</textarea></div>')+'</fieldset>';
-  if(self)h+='<fieldset><legend>Wann hast du Zeit?</legend>'+calHTML(p,true)+'</fieldset>';
-  if(self&&p.einwilligung)h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw" checked disabled><span>Eingewilligt bei der Registrierung: Die Agentur speichert meine Daten und Fotos und nutzt sie zur Vermittlung an Produktionen (DSGVO).'+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
+  if(self)h+='<fieldset><legend>Verfügbarkeit</legend><p class="cl" style="margin:-2px 0 10px;font-size:12.5px">Wann hast du Zeit?</p>'+calHTML(p,true)+'</fieldset>';
+  if(self&&p.einwilligung)h+='<input type="checkbox" id="f-einw" checked disabled hidden>';
   else h+='<fieldset><legend>Datenschutz</legend><label class="consent"><input type="checkbox" id="f-einw"'+(p.einwilligung?' checked':'')+'><span>'+(self?'Ich willige ein, dass die Agentur meine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Ich kann das Profil jederzeit ändern oder löschen.':'Die Person hat in die Speicherung ihrer Daten und Fotos eingewilligt (DSGVO).')+(p.einwilligungDatum?' Datum: '+esc(p.einwilligungDatum)+'.':'')+'</span></label></fieldset>';
   h+='<div class="ferr" id="ferr" role="alert"></div><div class="acts" style="margin-top:6px"><button type="submit" class="btn primary" id="saveBtn" data-id="'+esc(p.id||'')+'" data-lbl="'+(self?(isNew?'Profil erstellen':'Profil speichern'):'Speichern')+'">'+(self?(isNew?'Profil erstellen':'Profil speichern'):'Speichern')+'</button>'+(self?'':'<button type="button" class="btn" data-act="close">Abbrechen</button>')+'</div></form>';
   return h;
@@ -1665,6 +1670,7 @@ function kontoHTML(){
   if(state.lAntrag)h+='<p class="warn" role="status">Dein Löschantrag liegt vor. '+(isB?'Dein Profil ist gesperrt und wird nicht mehr vorgeschlagen, ':'')+'bis die Agentur ihn bearbeitet hat.</p><div class="acts" style="border:0;padding:0"><button type="button" class="btn" data-act="lwith">Antrag zurückziehen</button></div>';
   if(isB)h+='<div style="font-weight:700;font-size:17px;margin-bottom:8px">Newsletter</div><label class="consent" style="margin-top:0"><input type="checkbox" id="k-news"'+(news?' checked':'')+'><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label>';
   h+='<div style="font-weight:700;font-size:17px;margin:'+(isB?'32px':'8px')+' 0 12px">Passwort ändern</div><div style="max-width:420px"><div class="fld" style="margin-bottom:22px"><label for="kp-o">Aktuelles Passwort</label><input id="kp-o" type="password" autocomplete="current-password"></div><div class="fld" style="margin-bottom:12px"><label for="kp-n">Neues Passwort</label><input id="kp-n" type="password" autocomplete="new-password"></div><div class="fld"><label for="kp-n2">Neues Passwort wiederholen</label><input id="kp-n2" type="password" autocomplete="new-password"></div></div><div class="ferr" id="kp-err" role="alert"></div><div class="acts" style="border:0;padding:0;margin-top:6px"><button type="button" class="btn primary" data-act="kpw">Passwort ändern</button></div>';
+  if(isB&&(ctx.reg||{}).einwilligung)h+='<div style="font-weight:700;font-size:17px;margin:32px 0 8px">Datenschutz</div><p class="cl" style="margin:0">Bei der Registrierung hast du eingewilligt, dass die Agentur deine Daten und Fotos speichert und zur Vermittlung an Produktionen nutzt (DSGVO). Du kannst dein Profil jederzeit ändern oder löschen.</p>';
   h+='<div class="fl" style="margin-top:36px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
   return h;
 }
@@ -1889,18 +1895,16 @@ async function renderSelf(note){
 var WIZ_T=['Adresse und Kontakt','Aussehen und Maße','Fähigkeiten und Erfahrung','Fotos und Video'];
 function wizSetup(){
   var f=$('#form');if(!f)return;
-  var fs=f.querySelectorAll(':scope > fieldset'),person=fs[0],aus=fs[1];
+  var person=$('#fs-person'),aus=$('#fs-aus'),koen=$('#fs-koen'),ph=$('#fs-fotos');
   var tel=$('#f-telefon').parentNode,pm=$('#f-plzmsg');
   pm.insertAdjacentElement('afterend',tel);tel.style.marginTop='12px';
-  var ph=document.createElement('fieldset');ph.innerHTML='<legend>Fotos und Video</legend>';
-  ph.appendChild($('#pfld'));
+  ph.querySelector('legend').textContent='Fotos und Video';
   var vh=document.createElement('p');vh.className='cl';vh.style.margin='12px 0 0';
   vh.textContent=baseKat(state.selfBase||{})==='kd'?'Als Kleindarsteller brauchst du ein Vorstellungsvideo. Füge hier den Link ein, zum Beispiel von YouTube oder Vimeo.':'Ein Vorstellungsvideo ist freiwillig, hilft aber bei der Auswahl.';
   ph.appendChild(vh);ph.appendChild($('#lnkfld'));ph.appendChild($('#lnk2fld'));
-  f.insertBefore(ph,fs[3]);
-  person.dataset.wz='1';aus.dataset.wz='2';fs[2].dataset.wz='3';ph.dataset.wz='4';
-  fs[2].querySelector('legend').textContent=WIZ_T[2];
-  for(var i=3;i<fs.length;i++)fs[i].hidden=true;
+  f.insertBefore(ph,koen.nextSibling);
+  person.dataset.wz='1';aus.dataset.wz='2';koen.dataset.wz='3';ph.dataset.wz='4';
+  Array.prototype.forEach.call(f.querySelectorAll(':scope > fieldset'),function(x){if(!x.dataset.wz)x.hidden=true});
   person.querySelector('legend').textContent=WIZ_T[0];
   ['f-vorname','f-nachname'].forEach(function(id){var e=$('#'+id);if(e&&e.value.trim())e.parentNode.hidden=true});
   var bar=document.createElement('div');bar.className='wizbar';bar.id='wizbar';f.insertBefore(bar,f.firstChild);
@@ -2724,7 +2728,7 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-const APP_VERSION = '1.8.23 (25.10.2026)';
+const APP_VERSION = '1.8.24 (25.10.2026)';
 (function(){var e=document.getElementById('appver');if(e)e.textContent='Version '+APP_VERSION;})();
 let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
