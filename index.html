@@ -1867,15 +1867,10 @@ async function renderSelf(note){
   var rg=ctx.reg||{},pre={einwilligung:!!rg.einwilligung,email:myEmail,vorname:rg.vorname||(myName||'').split(' ')[0]||'',nachname:rg.nachname||(myName||'').split(' ').slice(1).join(' ')||''};
   if(!p&&ctx.reg){pre.typ=(rg.typ||[]).slice();pre.sprechrollen=!!rg.sprechrollen;pre.tagesrollen=!!rg.tagesrollen}
   state.selfBase=p||pre;
-  var wiz=false;
+  var wiz=!p;
   if(p)state.wiz=null;
-  else if(state.wiz&&state.wiz.uid===uid)wiz=true;
-  else{
-    var seen=false,wk='wiz-'+uid;
-    try{seen=localStorage.getItem(wk)==='1'}catch(e){seen=!!state.wizSeen}
-    if(!seen){state.wiz={uid:uid,step:1};wiz=true;state.wizSeen=true;try{localStorage.setItem(wk,'1')}catch(e){}}
-  }
-  var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':wiz?'Dein Profil anlegen':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':wiz?'In drei kurzen Schritten zu deinem Profil. Das machst du nur einmal. Später änderst du alles unter „Profil bearbeiten“.':'Dein Profil ist noch nicht angelegt. Fülle die mit * markierten Felder aus und klicke unten auf „Profil erstellen“.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>'+kontoHTML();
+  else if(!state.wiz||state.wiz.uid!==uid)state.wiz={uid:uid,step:1};
+  var h='<div class="selfwrap"><h2 style="font-size:30px">'+(p?'Dein Profil':wiz?'Dein Profil anlegen':'Willkommen')+'</h2><p class="intro" style="margin-top:6px">'+(p?'Hier kannst du deine Angaben jederzeit ändern.':wiz?'In drei kurzen Schritten zu deinem Profil. Brichst du ab, beginnst du beim nächsten Mal einfach von vorn. Später änderst du alles unter „Profil bearbeiten“.':'Dein Profil ist noch nicht angelegt. Fülle die mit * markierten Felder aus und klicke unten auf „Profil erstellen“.')+'</p>'+(p&&p.freigabe==='neu'?'<p class="warn" role="status">Dein Profil wird von der Agentur geprüft. Danach wirst du für Anfragen vorgeschlagen.</p>':p&&p.freigabe==='abgelehnt'?'<p class="warn" role="status">Dein Profil wurde nicht freigegeben. Bitte melde dich bei der Agentur.</p>':'')+(note?'<p class="okmsg" role="status">'+esc(note)+'</p>':'')+(canWrite?'':'<p class="warn">Du hast nur Leserechte. Bitte die Agentur, dich als Mitwirkenden einzuladen.</p>')+'<div style="margin-top:16px">'+formHTML(p||pre,true)+'</div></div>'+kontoHTML();
   host.innerHTML=h;
   if(wiz){wizSetup();wizShow(state.wiz.step||1)}
   if(p&&p.hasFoto){state.photoLoad=loadPhotos(p).then(function(m){state.photoDocs=m;refreshPhotoGrid()})}
