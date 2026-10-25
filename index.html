@@ -1661,11 +1661,11 @@ function kundeProfilHTML(u){
 function kontoHTML(){
   var isB=role==='bewerber';
   var news=!!((ctx.reg||{}).news);
-  var h='<div class="selfwrap" id="kontosec" style="margin-top:16px"><h2 style="font-size:24px">Konto</h2>';
+  var h='<div class="selfwrap" id="kontosec" style="margin-top:16px"><h2 style="font-size:24px">Kontoeinstellungen</h2><hr style="border:0;border-top:1px solid var(--line);margin:10px 0 16px">';
   if(state.lAntrag)h+='<p class="warn" role="status">Dein Löschantrag liegt vor. '+(isB?'Dein Profil ist gesperrt und wird nicht mehr vorgeschlagen, ':'')+'bis die Agentur ihn bearbeitet hat.</p><div class="acts" style="border:0;padding:0"><button type="button" class="btn" data-act="lwith">Antrag zurückziehen</button></div>';
-  if(isB)h+='<label class="consent" style="margin-top:10px"><input type="checkbox" id="k-news"'+(news?' checked':'')+'><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label>';
-  h+='<div class="fl" style="margin-top:14px">Passwort ändern</div><div style="max-width:420px"><div class="fld" style="margin-bottom:22px"><label for="kp-o">Aktuelles Passwort</label><input id="kp-o" type="password" autocomplete="current-password"></div><div class="fld" style="margin-bottom:12px"><label for="kp-n">Neues Passwort</label><input id="kp-n" type="password" autocomplete="new-password"></div><div class="fld"><label for="kp-n2">Neues Passwort wiederholen</label><input id="kp-n2" type="password" autocomplete="new-password"></div></div><div class="ferr" id="kp-err" role="alert"></div><div class="acts" style="border:0;padding:0;margin-top:6px"><button type="button" class="btn" data-act="kpw">Passwort ändern</button></div>';
-  h+='<div class="fl" style="margin-top:14px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
+  if(isB)h+='<div style="font-weight:700;font-size:17px;margin-bottom:8px">Newsletter</div><label class="consent" style="margin-top:0"><input type="checkbox" id="k-news"'+(news?' checked':'')+'><span>Ich möchte gelegentlich Neuigkeiten und Erinnerungen der Agentur per E-Mail erhalten (freiwillig, jederzeit widerrufbar).</span></label>';
+  h+='<div style="font-weight:700;font-size:17px;margin:'+(isB?'32px':'8px')+' 0 12px">Passwort ändern</div><div style="max-width:420px"><div class="fld" style="margin-bottom:22px"><label for="kp-o">Aktuelles Passwort</label><input id="kp-o" type="password" autocomplete="current-password"></div><div class="fld" style="margin-bottom:12px"><label for="kp-n">Neues Passwort</label><input id="kp-n" type="password" autocomplete="new-password"></div><div class="fld"><label for="kp-n2">Neues Passwort wiederholen</label><input id="kp-n2" type="password" autocomplete="new-password"></div></div><div class="ferr" id="kp-err" role="alert"></div><div class="acts" style="border:0;padding:0;margin-top:6px"><button type="button" class="btn primary" data-act="kpw">Passwort ändern</button></div>';
+  h+='<div class="fl" style="margin-top:36px">Deine Daten</div><div class="acts" style="border:0;padding:0;margin-top:4px"><button type="button" class="btn" data-act="kdl">Meine Daten herunterladen</button>'+(state.lAntrag?'':'<button type="button" class="btn danger" data-act="lreq">'+(state.lConfirm?'Wirklich beantragen':'Löschung beantragen')+'</button>')+'</div><p class="cl" style="margin:6px 0 0">Mit dem Löschantrag wird '+(isB?'dein Profil sofort gesperrt. ':'dein Konto zur Löschung vorgemerkt. ')+'Die Agentur löscht deine Daten danach endgültig.</p></div>';
   return h;
 }
 async function changePw(){
@@ -2724,7 +2724,7 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-const APP_VERSION = '1.8.22 (25.10.2026)';
+const APP_VERSION = '1.8.23 (25.10.2026)';
 (function(){var e=document.getElementById('appver');if(e)e.textContent='Version '+APP_VERSION;})();
 let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
