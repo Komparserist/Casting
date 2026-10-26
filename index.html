@@ -256,6 +256,22 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 #form .chk span{padding:2px 9px;min-height:24px;font-size:12px;letter-spacing:.03em}
 #form .chk input:checked+span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 
+/* Einheitliche Projekt-Karten und Protokoll */
+.card.pc{height:172px;align-items:stretch;overflow:hidden}
+.card.pc .ph{width:84px;align-self:flex-start}
+.card.pc .ci{flex:1;gap:4px;justify-content:flex-start;overflow:hidden}
+.pcn{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.pct{display:flex;gap:5px;flex-wrap:nowrap;overflow:hidden;min-height:20px;align-items:center}
+.pct .pill{font-size:11.5px;white-space:nowrap}
+.pcd{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin:2px 0 0}
+.pcd div{min-width:0}
+.pcd .w2{grid-column:1/-1}
+.pcd dt{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);line-height:1.1}
+.pcd dd{margin:0;font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mx{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;min-height:20px;font-size:12.5px}
+.logrow{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.logrow .cm{flex:none;width:44px}
+
 </style>
 </head>
 <body>
@@ -281,6 +297,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
     <button type="button" class="tab" data-act="view" data-v="proj" aria-pressed="false">Projekte<span class="dot" id="pdot" hidden aria-label="Neue Antwort vom Kunden"></span></button>
     <button type="button" class="tab" data-act="view" data-v="pruef" aria-pressed="false">Zu prüfen <span class="badge" id="pbadge" hidden>0</span></button>
     <button type="button" class="tab" data-act="view" data-v="konten" aria-pressed="false">Konten <span class="badge" id="kbadge" hidden>0</span></button>
+    <button type="button" class="tab" data-act="view" data-v="log" aria-pressed="false">Protokoll</button>
     <button type="button" class="tab" data-act="view" data-v="self" aria-pressed="false">Mein Profil</button>
     <button type="button" class="tab" data-act="view" data-v="edit" aria-pressed="false">Profil bearbeiten</button>
     <button type="button" class="tab" data-act="view" data-v="buch" aria-pressed="false">Anfragen und Buchungen<span class="dot" id="bdot" hidden aria-label="Neue Nachricht"></span></button>
@@ -323,6 +340,7 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
   <div id="v-kkonto" hidden></div>
   <div id="v-buch" hidden></div>
   <div id="v-bkonto" hidden></div>
+  <div id="v-log" hidden></div>
 </div>
 
 <div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
@@ -861,13 +879,47 @@ function sorter(){
 }
 
 /* ---------- Rendering ---------- */
+function sexLetter(g){return g==='weiblich'?'W':g==='männlich'?'M':g==='divers'?'D':''}
+function isFinal(d){return !!d&&(d.final===true||(d.final===undefined&&!!d.status&&d.status!=='offen'))}
+/* Einheitliche Karte fuer Projekte: immer gleiche Groesse, alle Felder, fehlende als N/A */
+function profCard(o,mode){
+  function v(x){return x==null||x===''?'N/A':esc(String(x))}
+  var herk=((o.plz||'')+' '+(o.ort||'')).trim();
+  var tl=(o.typ||[]).map(function(t){return t==='Kleindarsteller'?'KD':t});
+  var pills=tl.length?tl.map(function(t){return '<span class="pill">'+esc(t)+'</span>'}).join(''):'<span class="cl">N/A</span>';
+  var ini=((o.vorname||'').charAt(0)+(o.nachname||'').charAt(0)).toUpperCase()||'?';
+  var fo=o.thumb?'<img alt="" src="'+esc(o.thumb)+'">':esc(ini);
+  var body='<div class="ci"><div class="cn pcn">'+esc(((o.vorname||'')+' '+(o.nachname||'')).trim()||'N/A')+'</div><div class="pct">'+pills+'</div><dl class="pcd">'+
+    '<div><dt>Geschlecht</dt><dd>'+v(sexLetter(o.geschlecht))+'</dd></div><div><dt>Alter</dt><dd>'+v(o.alter!=null?o.alter+' J':'')+'</dd></div>'+
+    '<div class="w2"><dt>Herkunft</dt><dd>'+v(herk)+'</dd></div>'+
+    '<div><dt>Größe</dt><dd>'+v(o.groesse?o.groesse+' cm':'')+'</dd></div><div><dt>Konfektion</dt><dd>'+v(o.konfektion)+'</dd></div><div><dt>Schuhgröße</dt><dd>'+v(o.schuh)+'</dd></div></dl></div>';
+  if(mode&&mode.zoom)return '<div class="card pc kc"><button type="button" class="ph zoomable" data-act="kzoom" data-key="'+esc(mode.zoom)+'" aria-label="Fotos ansehen">'+fo+'</button>'+body+'</div>';
+  return '<button type="button" class="card pc" data-act="open" data-id="'+esc(mode&&mode.id||o.id)+'"><div class="ph">'+fo+'</div>'+body+'</button>';
+}
+function personCard(p){return profCard({id:p.id,vorname:p.vorname,nachname:p.nachname,thumb:p.thumb,typ:allTyp(p).map(function(t){return t==='Schauspieler'&&!schOK(p)?'Schauspieler (offen)':t}),geschlecht:p.geschlecht,alter:ageOf(p),plz:p.plz,ort:p.ort,groesse:p.groesse,konfektion:p.konfektion,schuh:p.schuh})}
+function inactTxt(p){
+  if(!p||!p.selbst)return '';
+  var act=p.lastActive||p.updatedAt||p.createdAt;if(!act)return '';
+  var d=(Date.now()-act)/86400000;
+  return d>183?'Inaktiv (seit mehr als 6 Monaten)':d>91?'Seit mehr als 3 Monaten nicht aktiv':'';
+}
+async function touchActive(){
+  try{var r=db.doc('people/'+uid),sn=await r.get();if(!sn.exists)return;var o=sn.data()||{};if(Date.now()-(o.lastActive||0)<43200000)return;await r.update({lastActive:Date.now()})}catch(e){}
+}
+/* Protokoll: Aenderungen durch Agentur und Produktion (nie durch Bewerber) */
+function logEv(text){
+  if(!db||!uid||role==='bewerber')return;
+  try{db.collection('protokoll').doc().set({at:Date.now(),by:uid,name:myName||myEmail||'',rolle:role,text:String(text).slice(0,300)}).catch(function(){})}catch(e){}
+}
+function pName(p){return p?(fullName(p)||'Ohne Namen'):'Unbekannt'}
 function cardHTML(p,extra){
   var age=ageOf(p);
   var meta=[age!=null?age+' J':null,p.groesse?p.groesse+' cm':null,p.konfektion?'Gr. '+p.konfektion:null,p.schuh?'Schuh '+p.schuh:null].filter(Boolean).join(' · ');
   var look=[p.haarfarbe,p.haarlaenge?'Haar '+p.haarlaenge:null,p.augenfarbe?'Augen '+p.augenfarbe:null].filter(Boolean).join(' · ');
   var tags='';
   allTyp(p).forEach(function(t){tags+='<span class="pill">'+esc(typLabel(p,t))+'</span>'});
-  if(p.selbst)tags+='<span class="cl">selbst eingetragen</span>';
+  if(!p.selbst)tags+='<span class="cl">Von Agentur eingetragen</span>';
+  var ia=isAdmin?inactTxt(p):'';if(ia)tags+='<span class="warn">'+esc(ia)+'</span>';
   if(p.ort||p.plz)tags+='<span class="cl">'+esc(((p.plz||'')+' '+(p.ort||'')).trim())+'</span>';
   var nf=nextFree(p);if(nf&&!extra)tags+='<span class="cl">frei ab '+fmtDM(nf)+'</span>';
   if(extra)tags+=extra;
@@ -974,7 +1026,8 @@ function detailHTML(p,confirmDel,ro,own){
   var h=own?'':'<div class="sh"><h2 id="sheetTitle">Profil</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
   h+='<div class="dhead"><'+(p.thumb&&!own?'button type="button" class="ph zoomable" data-act="zoom" data-id="'+esc(p.id)+'" aria-label="Foto vergrößern"':'div class="ph"')+' id="dph">'+(p.thumb?'<img alt="Foto von '+esc(fullName(p))+'" src="'+esc(p.thumb)+'">':esc(initials(p)))+'</'+(p.thumb&&!own?'button':'div')+'><div class="dn"><h2>'+esc(fullName(p))+'</h2><div class="tags">';
   allTyp(p).forEach(function(t){h+='<span class="pill">'+esc(typLabel(p,t))+'</span>'});
-  if(p.selbst)h+='<span class="cl">selbst eingetragen</span>';
+  if(!p.selbst)h+='<span class="cl">Von Agentur eingetragen</span>';
+  var ia2=isAdmin&&!own?inactTxt(p):'';if(ia2)h+='<span class="warn">'+esc(ia2)+'</span>'+(p.email?' <a href="mailto:'+esc(p.email)+'?subject='+encodeURIComponent('Bist du noch dabei?')+'&body='+encodeURIComponent('Hallo '+(p.vorname||'')+',\n\nwir haben länger nichts von dir gehört. Bitte schau kurz in die App und prüfe, ob dein Profil und deine Verfügbarkeit noch stimmen.\n\nViele Grüße')+'">Erinnerung schreiben</a>':'');
   h+='</div>';
   if(p.freigabe==='neu'||p.freigabe==='abgelehnt')h+='<p class="warn" style="margin:8px 0 0">'+(p.freigabe==='neu'?'Neues Profil, noch nicht freigegeben. Es wird erst nach der Freigabe für Projekte vorgeschlagen.':'Profil abgelehnt. Es wird nicht für Projekte vorgeschlagen.')+'</p>';
   if(hasSch(p)&&!schOK(p))h+='<p class="warn" style="margin:8px 0 0">Schauspieler-Nachweis noch offen'+(p.ausbildung?' (Schauspielausbildung angegeben)':'')+'. Wird nur als Komparse vorgeschlagen, falls auch Komparse gewählt ist.</p>';
@@ -1161,6 +1214,7 @@ async function save(id){
     if(state.photoLoad){try{await state.photoLoad}catch(e){}}
     await persistPhotos(ref.id,old,rec);
     await ref.set(rec);
+    logEv('Profil „'+(((rec.vorname||'')+' '+(rec.nachname||'')).trim()||'Ohne Namen')+'“ '+(id?'geändert':'von der Agentur angelegt'));
     toast(id?'Profil gespeichert':'Profil angelegt');
     var saved=Object.assign({id:ref.id},rec);
     closeSheet();
@@ -1217,6 +1271,10 @@ document.addEventListener('click',function(e){
   else if(act==='oktoggle'){var op2=curProj();if(op2){var m2=Object.assign({},op2.auswahl||{});if(m2[id]){m2[id]=Object.assign({},m2[id],{ok:m2[id].ok===false});saveSel(op2,m2)}}}
   else if(act==='unsel'){removeSel(id)}
   else if(act==='kdec'){kDecide(t.dataset.key,t.dataset.s)}
+  else if(act==='ksend'){state.kSendConf=t.dataset.id;renderKunde()}
+  else if(act==='ksendno'){state.kSendConf='';renderKunde()}
+  else if(act==='ksendok'){kSend(t.dataset.id)}
+  else if(act==='logmore'){state.logN=(state.logN||200)+200;renderLog()}
   else if(act==='kzoom'){kZoom(t.dataset.key)}
   else if(act==='close'){closeSheet()}
   else if(act==='wizfwd'){wizNext()}
@@ -1456,11 +1514,12 @@ async function sendDispo(){
       var p=findP(ids[i]);
       if(!p.selbst){noApp++;continue}
       var ref=db.doc('buchungen/'+ids[i]+'/e/'+pr.id),sn=await ref.get();
-      var o=sn.exists?(sn.data()||{}):{projId:pr.id,rolle:(pr.auswahl[ids[i]]||{}).rolle||'',ort:pr.ort||'',tage:pr.tage||[],at:now};
+      var o=sn.exists?(sn.data()||{}):{projId:pr.id,projName:pr.name||'',rolle:(pr.auswahl[ids[i]]||{}).rolle||'',ort:pr.ort||'',tage:pr.tage||[],at:now};
       o.dispos=(o.dispos||[]).concat([{id:id,betreff:item.betreff,text:item.text,at:now}]);
       await ref.set(o);
     }
     dd.text='';
+    logEv('Dispo für Projekt „'+(pr.name||'Ohne Namen')+'“ an '+ids.length+' Darsteller gesendet');
     toast('Dispo an '+(ids.length-noApp)+' Darsteller gesendet'+(noApp?'. '+noApp+' ohne App-Konto: bitte per E-Mail schicken.':''));
     state.dSending=false;
     renderProj();loadDispo(pr);
@@ -1597,6 +1656,7 @@ async function removePerson(id){
   try{
     var p=findP(id);
     await db.doc('people/'+id).delete();
+    logEv('Profil „'+pName(p)+'“ gelöscht');
     if(p&&p.hasFoto)await deletePhotos(id);
     closeSheet();toast('Profil gelöscht');
   }catch(e){toast('Löschen hat nicht geklappt. Versuche es noch einmal.')}
@@ -1614,13 +1674,13 @@ async function removeExamples(){
 
 /* ---------- Masken ---------- */
 function fmtDMY(s){return s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4)}
-function tabsFor(r){return r==='admin'?['kartei','proj','pruef','konten']:r==='kunde'?['kunde','kkonto']:['self','edit','buch','bkonto']}
+function tabsFor(r){return r==='admin'?['kartei','proj','pruef','konten','log']:r==='kunde'?['kunde','kkonto']:['self','edit','buch','bkonto']}
 function setView(v){
   var tabs=tabsFor(role);
   if(tabs.indexOf(v)<0)v=tabs[0];
   flushCal();
   state.view=v;
-  ['kartei','proj','self','edit','kunde','kkonto','bkonto','buch','pruef','konten'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
+  ['kartei','proj','self','edit','kunde','kkonto','bkonto','buch','pruef','konten','log'].forEach(function(k){$('#v-'+k).hidden=(k!==v)});
   Array.prototype.forEach.call(document.querySelectorAll('#nav .tab'),function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));b.hidden=tabs.indexOf(b.dataset.v)<0});
   $('#nav').hidden=tabs.length<2;
   $('#topact').hidden=!(isAdmin&&v==='kartei');
@@ -1632,6 +1692,7 @@ function setView(v){
   else if(v==='buch')renderBuch();
   else if(v==='pruef')renderPruef();
   else if(v==='konten')renderKonten();
+  else if(v==='log')renderLog();
   else if(v==='edit')renderSelf();
   else renderSelfView();
 }
@@ -1782,13 +1843,14 @@ function renderKonten(quiet){
 function refreshMailCount(){var b=$('#mcopy');if(b)b.textContent='Adressen kopieren ('+mailGroup().length+')'}
 async function kontoAction(id,act){
   var u=state.users.filter(function(x){return x.id===id})[0];if(!u)return;
+  var uname=(u.name||'Ohne Namen')+((u.reg||{}).firma?', '+u.reg.firma:'');
   state.kBusy=true;
   try{
-    if(act==='unlock'){await db.doc('users/'+id).update({gesperrt:false});if(u.rolle==='bewerber'&&findP(id))await db.doc('people/'+id).update({gesperrt:false,loeschantrag:null});await db.doc('users/'+id).update({loeschantrag:null});u.gesperrt=false;u.loeschantrag=null;var up=findP(id);if(up){up.gesperrt=false;up.loeschantrag=null}toast('Konto entsperrt. Der Darsteller muss seine Fotos neu hochladen.')}
+    if(act==='unlock'){await db.doc('users/'+id).update({gesperrt:false});if(u.rolle==='bewerber'&&findP(id))await db.doc('people/'+id).update({gesperrt:false,loeschantrag:null});await db.doc('users/'+id).update({loeschantrag:null});u.gesperrt=false;u.loeschantrag=null;var up=findP(id);if(up){up.gesperrt=false;up.loeschantrag=null}logEv('Konto „'+uname+'“ entsperrt');toast('Konto entsperrt. Der Darsteller muss seine Fotos neu hochladen.')}
     else if(act==='lock'){
       await db.doc('users/'+id).update({gesperrt:true});u.gesperrt=true;
       if(u.rolle==='bewerber'&&findP(id)){await lockPerson(id)}
-      toast('Konto gesperrt')
+      logEv('Konto „'+uname+'“ gesperrt');toast('Konto gesperrt')
     }
     else if(act==='del'){
       if(u.rolle==='bewerber'){await erasePerson(id)}
@@ -1798,7 +1860,7 @@ async function kontoAction(id,act){
       }
       await db.doc('users/'+id).set({rolle:u.rolle,name:'',email:'',gesperrt:true,geloescht:Date.now(),createdAt:u.createdAt||Date.now()});
       u.name='';u.email='';u.gesperrt=true;u.geloescht=Date.now();
-      toast('Konto und Daten gelöscht. Den Login selbst kannst du in der Firebase-Konsole unter Authentication entfernen.')
+      logEv('Konto „'+uname+'“ gelöscht');toast('Konto und Daten gelöscht. Den Login selbst kannst du in der Firebase-Konsole unter Authentication entfernen.')
     }
   }catch(e){toast('Das hat nicht geklappt. Versuche es noch einmal.')}
   state.kBusy=false;state.kConfirm=null;updateBadge();fillKonten();
@@ -1854,6 +1916,7 @@ async function setPerson(id,act){
   try{
     await db.doc('people/'+id).update(Object.assign({updatedAt:Date.now()},upd));
     var p=findP(id);if(p)Object.assign(p,upd);
+    logEv('Profil „'+pName(findP(id))+'“: '+(act==='pfreig'?'freigegeben':act==='pablehn'?'abgelehnt':'Schauspieler-Nachweis bestätigt'));
     toast(act==='pfreig'?'Profil freigegeben':act==='pablehn'?'Profil abgelehnt':'Als Schauspieler bestätigt');
     closeSheet();updateBadge();
     if(state.view==='pruef')renderPruef();else if(state.view==='kartei')renderList();
@@ -1864,6 +1927,7 @@ async function setUser(id,act){
   try{
     await db.doc('users/'+id).update(upd);
     state.users.forEach(function(u){if(u.id===id)Object.assign(u,upd)});
+    logEv('Konto „'+(((state.users.filter(function(x){return x.id===id})[0]||{}).name)||'Ohne Namen')+'“ '+(act==='ufreig'?'freigegeben':'abgelehnt'));
     toast(act==='ufreig'?'Konto freigegeben':'Konto abgelehnt');
     updateBadge();renderPruef();
   }catch(e){toast('Speichern hat nicht geklappt.')}
@@ -2166,7 +2230,7 @@ function renderProjDetail(){
   if(!state.loaded){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Wird geladen</h3></div>';return}
   if(!pr){host.innerHTML=h+'<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Lege ein Projekt mit Drehtagen und Rollen an. Danach siehst du sofort, wer verfügbar ist und passt.</p></div>';return}
   var days=projDays(pr),roles=pr.rollen||[];
-  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span>'+(pr.art?' <span class="cl">'+esc(pr.art)+'</span>':'')+'</p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
+  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span>'+(pr.art?' <span class="cl">'+esc(pr.art)+'</span>':'')+(!pr.ersteller?' <span class="cl">Von Agentur eingetragen</span>':'')+'</p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
   h+='<div class="sec" style="margin-top:14px"><h3>Drehtage</h3>'+((pr.tage||[]).filter(function(t){return t.von}).length?'<div class="days">'+(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('')+'</div><p class="cl" style="margin:6px 0 0">'+days.length+' Drehtag'+(days.length===1?'':'e')+' insgesamt</p>':'<span class="cl">Noch keine Drehtage eingetragen</span>')+'</div>';
   if(pr.regieName||pr.regieMail||pr.regieTel||pr.ort)h+='<div class="sec"><h3>Regie und Ort</h3>'+(pr.regieName?'<div class="cm">'+esc(pr.regieName)+'</div>':'')+copyRow(pr.regieMail)+copyRow(pr.regieTel)+(pr.ort?'<div class="cl">Drehort: '+esc(pr.ort)+'</div>':'')+(pr.oeffentlich?'<div class="cl">Für Bewerber sichtbar</div>':'')+'</div>';
   h+='<div class="sec"><h3>Anforderungen</h3>'+(roles.length?'<div class="rolegrid">'+roles.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div>'+(r.beschr?'<div class="cl">'+esc(r.beschr)+'</div>':'')+'</div>'}).join('')+'</div>':'<span class="cl">Keine Rollen angelegt, es werden alle Profile nach Verfügbarkeit gezeigt.</span>')+'</div>';
@@ -2190,12 +2254,12 @@ function renderProjDetail(){
   });
   var byName=function(x,y){return String(x.p.nachname||'').localeCompare(String(y.p.nachname||''),'de')||String(x.p.vorname||'').localeCompare(String(y.p.vorname||''),'de')};
   Object.keys(groups).forEach(function(k){groups[k].sort(function(x,y){return (y.a&&x.a?y.a.free-x.a.free:0)||byName(x,y)})});
-  var selIds=Object.keys(sel).filter(function(id){return findP(id)}),nOpen=selIds.filter(function(id){return sel[id].st==='auswahl'&&sel[id].ok!==false}).length;
+  var selIds=Object.keys(sel).filter(function(id){return findP(id)&&effSt(pr,id)!=='abgelehnt'}),nOpen=selIds.filter(function(id){return sel[id].st==='auswahl'&&sel[id].ok!==false}).length;
   if(selIds.length){
     h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Wähle unter „Bearbeiten“ den Kunden aus, um die Auswahl zu senden.</span>')+'</div><div class="grid">'+selIds.map(function(id){
       var p=findP(id),st=effSt(pr,id);
       var bw=sel[id].bew&&st==='auswahl';
-      return '<div class="mwrap">'+(st==='auswahl'?'<label class="consent" style="margin:0 0 6px"><input type="checkbox" data-act="oktoggle" data-id="'+esc(id)+'"'+(sel[id].ok===false?'':' checked')+'><span>An Kunden senden</span></label>':'')+cardHTML(p,statTag(st)+(bw?'<span class="score part">hat sich beworben, Zeit bestätigt</span>':'')+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':''))+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
+      return '<div class="mwrap">'+(st==='auswahl'?'<label class="consent" style="margin:0 0 6px"><input type="checkbox" data-act="oktoggle" data-id="'+esc(id)+'"'+(sel[id].ok===false?'':' checked')+'><span>An Kunden senden</span></label>':'')+personCard(p)+'<div class="mx">'+statTag(st)+(bw?'<span class="score part">hat sich beworben, Zeit bestätigt</span>':'')+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':'')+'</div>'+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
     }).join('')+'</div>';
   }
   h+=dispoHTML(pr,sel);
@@ -2212,14 +2276,14 @@ function renderProjDetail(){
         else sc='<span class="score no">Kalender reicht noch nicht</span>';
       }
       if(roles.length&&!state.roleSel)sc+='<span class="cl">'+esc(m.mr.map(function(r){return r.name||'Rolle'}).join(', '))+'</span>';
-      return '<div class="mwrap">'+cardHTML(m.p,sc||' ')+'<button type="button" class="btn small" data-act="merk" data-id="'+esc(m.p.id)+'">'+(sel[m.p.id]?'In Auswahl ✓':'Zur Auswahl')+'</button></div>';
+      return '<div class="mwrap">'+personCard(m.p)+'<div class="mx">'+(sc||'&nbsp;')+'</div>'+'<button type="button" class="btn small" data-act="merk" data-id="'+esc(m.p.id)+'">'+(sel[m.p.id]?'In Auswahl ✓':'Zur Auswahl')+'</button></div>';
     }).join('')+'</div>';
   });
   if(!any)h+='<div class="empty" style="margin-top:14px"><h3>Niemand passt</h3><p>Kein Profil erfüllt die Anforderungen'+(state.roleSel?' dieser Rolle':'')+'. Lockere ein Kriterium unter „Bearbeiten“.</p></div>';
   host.innerHTML=h;
 }
 function projToDraft(pr){
-  var d={id:pr?pr.id:'',name:pr?pr.name||'':'',produktion:pr?pr.produktion||'':(role==='kunde'?((ctx.reg||{}).firma||''):''),art:pr?pr.art||'':'',gage:pr?pr.gage||'':'',notiz:pr?pr.notiz||'':'',regieName:pr?pr.regieName||'':(role==='kunde'?myName:''),regieMail:pr?pr.regieMail||'':(role==='kunde'?myEmail:''),regieTel:pr?pr.regieTel||'':(role==='kunde'?((ctx.reg||{}).telefon||''):''),kundeId:pr?pr.kundeId||'':'',ort:pr?pr.ort||'':'',oeffentlich:!!(pr&&pr.oeffentlich),tage:[],rollen:[]};
+  var d={id:pr?pr.id:'',name:pr?pr.name||'':'',anzeigename:pr?pr.anzeigename||'':'',produktion:pr?pr.produktion||'':(role==='kunde'?((ctx.reg||{}).firma||''):''),art:pr?pr.art||'':'',gage:pr?pr.gage||'':'',notiz:pr?pr.notiz||'':'',regieName:pr?pr.regieName||'':(role==='kunde'?myName:''),regieMail:pr?pr.regieMail||'':(role==='kunde'?myEmail:''),regieTel:pr?pr.regieTel||'':(role==='kunde'?((ctx.reg||{}).telefon||''):''),kundeId:pr?pr.kundeId||'':'',ort:pr?pr.ort||'':'',oeffentlich:!!(pr&&pr.oeffentlich),tage:[],rollen:[]};
   ((pr&&pr.tage)||[]).forEach(function(t){d.tage.push({von:t.von||'',bis:t.bis&&t.bis!==t.von?t.bis:''})});
   if(!d.tage.length)d.tage.push({von:'',bis:''});
   ((pr&&pr.rollen)||[]).forEach(function(r){var o={id:r.id};ROLEF.forEach(function(f){var v=r[f.k];o[f.k]=f.t==='list'?(v||[]).join(', '):(v==null?'':String(v))});d.rollen.push(o)});
@@ -2233,7 +2297,7 @@ function kundenOptions(cur){
 }
 function projFormHTML(d){
   var h='<form id="pform" novalidate><div class="sh"><h2 id="sheetTitle">'+(d.id?'Projekt bearbeiten':'Neues Projekt')+'</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div>';
-  h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Projektname'+(isAdmin?'':' *')+'</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-prod">Produktion, Kunde'+(isAdmin?'':' *')+'</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div><div class="fld"><label for="p-art">Was wird gedreht'+(isAdmin?'':' *')+'</label><input id="p-art" data-pf="art" value="'+esc(d.art)+'" autocomplete="off" placeholder="z. B. Kinofilm, Serie, Werbung"></div><div class="fld"><label for="p-gage">Gage (sehen auch Bewerber)</label><input id="p-gage" data-pf="gage" value="'+esc(d.gage)+'" autocomplete="off" placeholder="z. B. 120 € pro Tag"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
+  h+='<fieldset><legend>Projekt</legend><div class="cols wide"><div class="fld"><label for="p-name">Name (erscheint nur bei festen Buchungen)'+(isAdmin?'':' *')+'</label><input id="p-name" data-pf="name" value="'+esc(d.name)+'" autocomplete="off" data-first></div><div class="fld"><label for="p-aname">Angezeigter Name (bei Anfragen)</label><input id="p-aname" data-pf="anzeigename" value="'+esc(d.anzeigename)+'" autocomplete="off" placeholder="z. B. Kinofilm in Köln"></div><div class="fld"><label for="p-prod">Produktion, Kunde'+(isAdmin?'':' *')+'</label><input id="p-prod" data-pf="produktion" value="'+esc(d.produktion)+'" autocomplete="off"></div><div class="fld"><label for="p-art">Was wird gedreht'+(isAdmin?'':' *')+'</label><input id="p-art" data-pf="art" value="'+esc(d.art)+'" autocomplete="off" placeholder="z. B. Kinofilm, Serie, Werbung"></div><div class="fld"><label for="p-gage">Gage (sehen auch Bewerber)</label><input id="p-gage" data-pf="gage" value="'+esc(d.gage)+'" autocomplete="off" placeholder="z. B. 120 € pro Tag"></div></div><div class="fld" style="margin-top:12px"><label for="p-notiz">Notizen</label><textarea id="p-notiz" data-pf="notiz">'+esc(d.notiz)+'</textarea></div></fieldset>';
   h+='<fieldset><legend>'+(isAdmin?'Regie und Kunde':'Regie und Ort')+'</legend><div class="cols wide"><div class="fld"><label for="p-rn">Ansprechperson Regie'+(isAdmin?'':' *')+'</label><input id="p-rn" data-pf="regieName" value="'+esc(d.regieName)+'" autocomplete="off"></div><div class="fld"><label for="p-rm">E-Mail Regie'+(isAdmin?'':' *')+'</label><input id="p-rm" data-pf="regieMail" value="'+esc(d.regieMail)+'" autocomplete="off" inputmode="email"></div><div class="fld"><label for="p-rt">Telefon Regie'+(isAdmin?'':' *')+'</label><input id="p-rt" data-pf="regieTel" value="'+esc(d.regieTel)+'" autocomplete="off" inputmode="tel"></div>'+(isAdmin?'<div class="fld"><label for="p-kid">Kunde (nötig, um die Auswahl zu senden)</label><select id="p-kid" data-pf="kundeId">'+kundenOptions(d.kundeId)+'</select></div>':'')+'<div class="fld"><label for="p-ort">Drehort'+(isAdmin?' (sehen auch Bewerber)':' *')+'</label><input id="p-ort" data-pf="ort" value="'+esc(d.ort)+'" autocomplete="off"></div></div>'+(isAdmin?'<label class="consent" style="margin-top:12px"><input type="checkbox" data-pf="oeffentlich" '+(d.oeffentlich?'checked':'')+'><span>Für Bewerber sichtbar machen (nur Zeitraum, Ort und gesuchte Rollen, ohne Projektname und Kunde)</span></label>':'')+'</fieldset>';
   h+='<fieldset><legend>Drehtage</legend>'+d.tage.map(function(t,i){return '<div class="drow"><div class="fld"><label for="pt-v'+i+'">Von</label><input type="date" id="pt-v'+i+'" data-pt="'+i+'" data-k="von" value="'+esc(t.von)+'"></div><div class="fld"><label for="pt-b'+i+'">Bis (leer = ein Tag)</label><input type="date" id="pt-b'+i+'" data-pt="'+i+'" data-k="bis" value="'+esc(t.bis)+'"></div><button type="button" class="btn small" data-act="ptdel" data-i="'+i+'" aria-label="Zeitraum entfernen">Entfernen</button></div>'}).join('')+'<button type="button" class="btn small" data-act="ptadd">Weiterer Zeitraum</button></fieldset>';
   h+='<fieldset><legend>Rollen und Anforderungen</legend><p class="cl" style="margin:0 0 10px">Leere Felder bedeuten: egal. Beim Alter wird das Spielalter geprüft.</p>'+d.rollen.map(function(r,i){
@@ -2284,6 +2348,7 @@ async function saveProj(){
     var old=d.id?curProj():null;
     var ref=d.id?db.doc('projekte/'+d.id):db.collection('projekte').doc();
     var rec={name:d.name.trim(),tage:tage,rollen:rollen,createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
+    if(String(d.anzeigename||'').trim())rec.anzeigename=String(d.anzeigename).trim();
     if(d.produktion.trim())rec.produktion=d.produktion.trim();
     if(d.art.trim())rec.art=d.art.trim();
     if(String(d.gage||'').trim())rec.gage=String(d.gage).trim();
@@ -2301,7 +2366,8 @@ async function saveProj(){
     if(role==='kunde'){rec.ersteller=uid;rec.kundeId=uid;rec.erstellerName=myName||myEmail;delete rec.oeffentlich;if(old&&old.oeffentlich)rec.oeffentlich=true}
     else if(old&&old.ersteller){rec.ersteller=old.ersteller;if(old.erstellerName)rec.erstellerName=old.erstellerName}
     await ref.set(rec);
-    if(isAdmin)syncAusschreibung(ref.id,rec);
+    logEv('Projekt „'+rec.name+'“ '+(old?'geändert':'angelegt'));
+    if(isAdmin){syncAusschreibung(ref.id,rec);Object.keys(rec.auswahl||{}).forEach(function(k){if(rec.auswahl[k].st==='gebucht'&&(findP(k)||{}).selbst){try{db.doc('buchungen/'+k+'/e/'+ref.id).update({projName:rec.name}).catch(function(){})}catch(e){}}})}
     state.pid=ref.id;state.roleSel='';if(isAdmin)state.pOpen=true;
     toast('Projekt gespeichert');
     closeSheet();
@@ -2318,7 +2384,7 @@ function effSt(pr,pid){
   var e=(pr.auswahl||{})[pid];if(!e)return null;
   if(e.st==='gebucht')return 'gebucht';
   var d=state.decAll[pr.id+'_'+pid];
-  if(e.st==='gesendet'&&d&&(d.status==='bestaetigt'||d.status==='abgelehnt'))return d.status;
+  if(e.st==='gesendet'&&d&&(d.status==='bestaetigt'||d.status==='abgelehnt')&&isFinal(d))return d.status;
   return e.st;
 }
 function statTag(st){var x=STAT[st]||['',''];return '<span class="score '+x[1]+'">'+x[0]+'</span>'}
@@ -2331,10 +2397,19 @@ function watchDec(pr){
   try{
     state.decUnsub=db.collection('kunden/'+key+'/auswahl').onSnapshot(function(snap){
       var m={};snap.docs.forEach(function(d){m[d.id]=d.data()||{}});
-      state.decAll=m;
+      state.decAll=m;cleanRejected();
       if(state.view==='proj'&&$('#scrim').hidden)renderProj();
     },function(){});
   }catch(e){}
+}
+function cleanRejected(){
+  if(!isAdmin||!state.decKey)return;
+  state.projects.forEach(function(pr){
+    if(pr.kundeId!==state.decKey)return;
+    var m=Object.assign({},pr.auswahl||{}),n=0;
+    Object.keys(m).forEach(function(id){var d=state.decAll[pr.id+'_'+id];if(m[id].st==='gesendet'&&d&&d.status==='abgelehnt'&&isFinal(d)){delete m[id];n++}});
+    if(n){pr.auswahl=m;db.doc('projekte/'+pr.id).update({auswahl:m,updatedAt:Date.now()}).catch(function(){})}
+  });
 }
 async function saveSel(pr,map){
   pr.auswahl=map;renderProj();
@@ -2358,6 +2433,7 @@ async function removeSel(pid){
   var m=Object.assign({},pr.auswahl||{});delete m[pid];
   if(pr.kundeId){try{await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+pid).delete()}catch(e){}}
   try{await db.doc('buchungen/'+pid+'/e/'+pr.id).delete()}catch(e){}
+  logEv('„'+pName(findP(pid))+'“ aus der Auswahl von Projekt „'+(pr.name||'Ohne Namen')+'“ entfernt');
   saveSel(pr,m);
   if(pr.oeffentlich)syncAusschreibung(pr.id,Object.assign({},pr,{auswahl:m}));
 }
@@ -2379,8 +2455,10 @@ function bookSel(pid){
   if(p&&p.email){var a=document.createElement('a');a.href=bookMail(p,pr,rolle);document.body.appendChild(a);a.click();a.remove();toast('Gebucht. Die Mail ist vorbereitet, tippe im Mailprogramm auf Senden.')}
   else toast('Als gebucht eingetragen. Im Profil steht keine E-Mail, daher keine Mail.');
   saveSel(pr,m);
+  logEv('„'+pName(p)+'“ für Projekt „'+(pr.name||'Ohne Namen')+'“ gebucht');
+  if(projStatus(Object.assign({},pr,{auswahl:m}))==='voll')logEv('Projekt „'+(pr.name||'Ohne Namen')+'“ voll besetzt');
   if(pr.oeffentlich)syncAusschreibung(pr.id,Object.assign({},pr,{auswahl:m}));
-  if(p&&p.selbst){var bref=db.doc('buchungen/'+pid+'/e/'+pr.id);bref.get().then(function(sn){var o=sn.exists?(sn.data()||{}):{};return bref.set(Object.assign({},o,{projId:pr.id,rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:o.at||Date.now()}))}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
+  if(p&&p.selbst){var bref=db.doc('buchungen/'+pid+'/e/'+pr.id);bref.get().then(function(sn){var o=sn.exists?(sn.data()||{}):{};return bref.set(Object.assign({},o,{projId:pr.id,projName:pr.name||'',rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:o.at||Date.now()}))}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
 }
 async function sendSel(){
   var pr=curProj();if(!pr||!pr.kundeId||state.sending)return;
@@ -2393,26 +2471,45 @@ async function sendSel(){
       try{ph=await loadPhotos(p)}catch(e){}
       var fotos=[];
       ['portrait','ganzkoerper','profil'].forEach(function(k){if(ph[k]){fotos.push({l:(ALLSLOTS.filter(function(s){return s.k===k})[0]||{}).l||k,src:ph[k].data||ph[k].thumb})}});
-      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',link:safeUrl(p.link),link2:safeUrl(p.link2),fotos:fotos};
+      var snap={vorname:p.vorname||'',nachname:p.nachname||'',typ:effTyp(p),geschlecht:p.geschlecht||'',alter:ageOf(p),plz:p.plz||'',spielVon:p.spielVon!=null?p.spielVon:null,spielBis:p.spielBis!=null?p.spielBis:null,groesse:p.groesse||null,konfektion:p.konfektion||'',schuh:p.schuh||null,haarfarbe:p.haarfarbe||'',haarlaenge:p.haarlaenge||'',augenfarbe:p.augenfarbe||'',bart:p.bart||'',sprachen:p.sprachen||[],fertigkeiten:p.fertigkeiten||[],ort:p.ort||'',thumb:p.thumb||'',link:safeUrl(p.link),link2:safeUrl(p.link2),fotos:fotos};
       while(JSON.stringify(snap).length>220000&&snap.fotos.length)snap.fotos.pop();
-      await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',snap:snap,sentAt:Date.now()});
+      await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+p.id).set({projId:pr.id,pid:p.id,projName:pr.name||'',produktion:pr.produktion||'',tage:pr.tage||[],rolle:m[p.id].rolle||'',status:'offen',final:false,snap:snap,sentAt:Date.now()});
       m[p.id]=Object.assign({},m[p.id],{st:'gesendet',sentAt:Date.now()});
     }
     pr.auswahl=m;
     await db.doc('projekte/'+pr.id).update({auswahl:m,updatedAt:Date.now()});
-    toast(ids.length+' Profil'+(ids.length===1?'':'e')+' an den Kunden gesendet');
+    toast(ids.length+' Profil'+(ids.length===1?'':'e')+' an den Kunden gesendet');logEv('Auswahl für Projekt „'+(pr.name||'Ohne Namen')+'“ an Kunden gesendet ('+ids.length+' Darsteller)');
   }catch(e){toast('Senden hat nicht geklappt. Versuche es noch einmal.')}
   state.sending=false;renderProj();
 }
 async function syncAusschreibung(id,rec){
   try{
     if(rec&&rec.oeffentlich){
-      await db.doc('ausschreibung/'+id).set({ort:rec.ort||'',gage:rec.gage||'',geschlossen:projStatus(rec)==='voll',tage:rec.tage||[],rollen:(rec.rollen||[]).map(function(r){return {id:r.id||'',name:r.name||'',anzahl:r.anzahl||null,typ:r.typ||'',beschr:r.beschr||'',krit:roleCrit(r)}}),updatedAt:Date.now()});
+      await db.doc('ausschreibung/'+id).set({titel:rec.anzeigename||rec.art||'',ort:rec.ort||'',gage:rec.gage||'',geschlossen:projStatus(rec)==='voll',tage:rec.tage||[],rollen:(rec.rollen||[]).map(function(r){return {id:r.id||'',name:r.name||'',anzahl:r.anzahl||null,typ:r.typ||'',beschr:r.beschr||'',krit:roleCrit(r)}}),updatedAt:Date.now()});
     }else await db.doc('ausschreibung/'+id).delete();
   }catch(e){}
 }
 
 /* Kundenbereich */
+async function renderLog(){
+  var host=$('#v-log');$('#count').textContent='Protokoll';
+  host.innerHTML='<div class="selfwrap"><h2 style="font-size:28px">Protokoll</h2><p class="cl" style="margin:4px 0 0">Änderungen durch die Agentur und durch Produktionen. Änderungen von Bewerbern an ihren eigenen Profilen stehen hier nicht.</p><p class="cl" style="margin-top:12px">Wird geladen …</p></div>';
+  var arr=[];
+  try{var qs=await db.collection('protokoll').get();arr=qs.docs.map(function(d){return d.data()||{}})}catch(e){}
+  if(state.view!=='log')return;
+  arr.sort(function(a,b){return (b.at||0)-(a.at||0)});
+  var total=arr.length;arr=arr.slice(0,state.logN||200);
+  var h='<div class="selfwrap"><h2 style="font-size:28px">Protokoll</h2><p class="cl" style="margin:4px 0 0">Änderungen durch die Agentur und durch Produktionen. Änderungen von Bewerbern an ihren eigenen Profilen stehen hier nicht.</p>';
+  if(!arr.length)h+='<p class="cl" style="margin-top:12px">Noch keine Einträge.</p>';
+  var last='';
+  arr.forEach(function(e){
+    var dt=new Date(e.at||0),day=dt.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    if(day!==last){h+='<h3 style="margin:18px 0 6px">'+esc(day)+'</h3>';last=day}
+    h+='<div class="logrow"><span class="cm">'+esc(dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}))+'</span><div><div>'+esc(e.text||'')+'</div><div class="cl">'+esc((e.rolle==='kunde'?'Produktion':'Agentur')+(e.name?', '+e.name:''))+'</div></div></div>';
+  });
+  if(total>arr.length)h+='<div class="acts" style="border:0;padding:0;margin-top:14px"><button type="button" class="btn" data-act="logmore">Ältere Einträge anzeigen</button></div>';
+  host.innerHTML=h+'</div>';
+}
 function renderBKonto(){
   $('#count').textContent='Dein Konto';
   $('#v-bkonto').innerHTML=kontoHTML();
@@ -2437,28 +2534,52 @@ async function renderKunde(){
     h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+(pr.gage?'<p class="cl" style="margin:4px 0 0">Gage: '+esc(pr.gage)+'</p>':'')+'</div><div class="topact">'+(pr.ersteller!==uid?'<span class="cl">Von der Agentur angelegt</span>':state.kDelId===pr.id?'<button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Endgültig löschen</button><button type="button" class="btn" data-act="kpno">Abbrechen</button>':'<button type="button" class="btn" data-act="kpedit" data-id="'+esc(pr.id)+'">Bearbeiten</button><button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Löschen</button>')+'</div></div>'+
       (tg?'<div class="sec" style="margin-top:12px"><h3>Drehtage</h3><div class="days">'+tg+'</div></div>':'')+
       ((pr.rollen||[]).length?'<div class="sec"><h3>Gesucht</h3><div class="rolegrid">'+pr.rollen.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div></div>'}).join('')+'</div></div>':'')+'</div>';
+    var gb=Object.keys(pr.auswahl||{}).some(function(k){return (pr.auswahl[k]||{}).st==='gebucht'});
+    if(gb)h+='<p class="okmsg" role="status" style="margin:8px 4px 0">Die ausgewählten Darsteller wurden gebucht.</p>';
     var arr=docs.filter(function(d){return d.projId===pr.id});
     if(!arr.length){h+='<p class="cl" style="margin:8px 4px 0">Die Agentur hat noch keine Profile vorgeschlagen.</p>';return}
-    h+='<h2 class="mh">Vorschläge der Agentur <small>'+arr.length+'</small></h2><div class="grid">';
+    var dr=state.kdraft||{},open=arr.filter(function(d){return !isFinal(d)}),undec=open.filter(function(d){return !dr[d.key]}).length;
+    h+='<h2 class="mh">Vorschläge der Agentur <small>'+arr.length+'</small></h2>';
+    if(open.length){
+      h+='<div class="pbar" style="margin-top:6px">'+(state.kSendConf===pr.id?'<span class="cl" style="flex:1 1 100%">Wirklich absenden? Danach kannst du deine Entscheidungen nicht mehr ändern.</span><button type="button" class="btn primary" data-act="ksendok" data-id="'+esc(pr.id)+'">Ja, absenden</button><button type="button" class="btn" data-act="ksendno">Abbrechen</button>':'<button type="button" class="btn primary" data-act="ksend" data-id="'+esc(pr.id)+'"'+(undec?' disabled':'')+'>Absenden</button>'+(undec?'<span class="cl">Noch '+undec+' ohne Entscheidung</span>':'<span class="cl">Alle Entscheidungen getroffen</span>'))+'</div>';
+    }
+    h+='<div class="grid">';
     arr.sort(function(a,b){return String((a.snap||{}).nachname||'').localeCompare(String((b.snap||{}).nachname||''),'de')}).forEach(function(d){
-      var s=d.snap||{},st=d.status||'offen';
-      var meta=[s.alter!=null?s.alter+' J':null,s.groesse?s.groesse+' cm':null,s.konfektion?'Gr. '+s.konfektion:null].filter(Boolean).join(' · ');
-      var look=[s.haarfarbe,s.haarlaenge?'Haar '+s.haarlaenge:null,s.augenfarbe?'Augen '+s.augenfarbe:null,s.bart].filter(Boolean).join(' · ');
-      var fo=(s.fotos&&s.fotos.length)?s.fotos[0].src:s.thumb;
-      h+='<div class="mwrap"><div class="card kc"><button type="button" class="ph zoomable" data-act="kzoom" data-key="'+esc(d.key)+'" aria-label="Fotos ansehen">'+(fo?'<img alt="" src="'+esc(s.thumb||fo)+'">':esc(((s.vorname||'').charAt(0)+(s.nachname||'').charAt(0)).toUpperCase()||'?'))+'</button><div class="ci"><div class="cn">'+esc((s.vorname||'')+' '+(s.nachname||''))+'</div>'+(meta?'<div class="cm">'+esc(meta)+'</div>':'')+(look?'<div class="cl">'+esc(look)+'</div>':'')+'<div class="tags">'+(s.typ||[]).map(function(t){return '<span class="pill">'+esc(t)+'</span>'}).join('')+(s.ort?'<span class="cl">'+esc(s.ort)+'</span>':'')+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'')+'</div>'+((s.sprachen||[]).length||(s.fertigkeiten||[]).length?'<div class="cl">'+esc((s.sprachen||[]).concat(s.fertigkeiten||[]).join(', '))+'</div>':'')+(linkHTML(s.link)?'<div class="cl">Link: '+linkHTML(s.link)+'</div>':'')+'</div></div>'+
-        '<div class="pbar" style="margin:0"><button type="button" class="btn small'+(st==='bestaetigt'?' primary':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="bestaetigt">'+(st==='bestaetigt'?'Bestätigt ✓':'Bestätigen')+'</button><button type="button" class="btn small'+(st==='abgelehnt'?' danger':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="abgelehnt">'+(st==='abgelehnt'?'Abgelehnt ✓':'Ablehnen')+'</button></div></div>';
+      var s=d.snap||{},fin=isFinal(d),st=fin?(d.status||'offen'):(dr[d.key]||'offen');
+      var booked=((pr.auswahl||{})[d.pid]||{}).st==='gebucht';
+      var card=profCard({vorname:s.vorname,nachname:s.nachname,thumb:s.thumb||((s.fotos&&s.fotos[0])||{}).src,typ:s.typ||[],geschlecht:s.geschlecht,alter:s.alter,plz:s.plz,ort:s.ort,groesse:s.groesse,konfektion:s.konfektion,schuh:s.schuh},{zoom:d.key});
+      h+='<div class="mwrap">'+card+'<div class="mx">'+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'&nbsp;')+(booked?'<span class="score">gebucht</span>':'')+'</div>'+
+        (fin?'<div class="pbar" style="margin:0"><span class="pill">'+(st==='bestaetigt'?'Bestätigt':'Abgelehnt')+'</span><span class="cl">abgesendet</span></div>':
+        '<div class="pbar" style="margin:0"><button type="button" class="btn small'+(st==='bestaetigt'?' primary':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="bestaetigt">'+(st==='bestaetigt'?'Bestätigt ✓':'Bestätigen')+'</button><button type="button" class="btn small'+(st==='abgelehnt'?' danger':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="abgelehnt">'+(st==='abgelehnt'?'Abgelehnt ✓':'Ablehnen')+'</button></div>')+'</div>';
     });
     h+='</div>';
   });
   host.innerHTML=h;
 }
-async function kDecide(key,s){
-  var d=state.kdocs&&state.kdocs[key];if(!d)return;
-  var ns=d.status===s?'offen':s;
-  d.status=ns;
-  try{await db.doc('kunden/'+uid+'/auswahl/'+key).update({status:ns,decidedAt:Date.now()});if(d.projId)db.doc('projekte/'+d.projId).update({kundeAntwortAt:Date.now()}).catch(function(){});toast(ns==='bestaetigt'?'Bestätigt':ns==='abgelehnt'?'Abgelehnt':'Entscheidung zurückgenommen')}
-  catch(e){toast('Speichern hat nicht geklappt.')}
+function kDecide(key,st){
+  var d=state.kdocs&&state.kdocs[key];if(!d||isFinal(d))return;
+  state.kdraft=state.kdraft||{};
+  if(state.kdraft[key]===st)delete state.kdraft[key];else state.kdraft[key]=st;
+  state.kSendConf='';
   renderKunde();
+}
+async function kSend(projId){
+  var dr=state.kdraft||{},docs=Object.keys(state.kdocs||{}).map(function(k){return state.kdocs[k]}).filter(function(d){return d.projId===projId&&!isFinal(d)});
+  if(!docs.length||docs.some(function(d){return !dr[d.key]}))return;
+  var ok=0,no=0;
+  try{
+    for(var i=0;i<docs.length;i++){
+      var d=docs[i];
+      await db.doc('kunden/'+uid+'/auswahl/'+d.key).update({status:dr[d.key],final:true,decidedAt:Date.now()});
+      if(dr[d.key]==='bestaetigt')ok++;else no++;
+      delete dr[d.key];
+    }
+    db.doc('projekte/'+projId).update({kundeAntwortAt:Date.now()}).catch(function(){});
+    var pr=state.projects.filter(function(x){return x.id===projId})[0];
+    logEv('Entscheidung zu Projekt „'+((pr&&pr.name)||'Ohne Namen')+'“ abgesendet ('+ok+' bestätigt, '+no+' abgelehnt)');
+    toast('Abgesendet. Die Agentur hat deine Auswahl erhalten.');
+  }catch(e){toast('Absenden hat nicht geklappt. Versuche es noch einmal.')}
+  state.kSendConf='';renderKunde();
 }
 function kZoom(key){
   var d=state.kdocs&&state.kdocs[key];if(!d)return;
@@ -2497,7 +2618,7 @@ async function loadBuchungen(){
       var nw=!g[d.id],dt=new Date(d.at),op=!!open[d.id];
       return '<div class="msg'+(nw?' new':'')+'"><button type="button" class="msgh" data-act="msg" data-p="'+esc(b.projId)+'" data-d="'+esc(d.id)+'" aria-expanded="'+op+'">'+(nw?'<span class="dot" aria-hidden="true"></span>':'')+'<span class="mt">'+(nw?'<span class="pill">Neu</span> ':'')+'Dispo: '+esc((d.betreff||'Dispo').replace(/^Dispo:\s*/i,''))+'</span><span class="cl">'+esc(dt.toLocaleDateString('de-DE'))+'</span></button><div class="msgb" id="m-'+esc(d.id)+'"'+(op?'':' hidden')+'>'+esc(d.text||'')+'</div></div>';
     }).join('');
-    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(bookingNew(b)?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht.'+(ds.length?'':' Weitere Infos bekommst du per E-Mail.')+'</div>'+dh+'</div>';
+    return '<div class="role"><b>'+esc(b.projName||tageStr(b.tage)||'Termin offen')+'</b>'+(bookingNew(b)?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+(b.projName?'<div class="cm">'+esc(tageStr(b.tage)||'Termin offen')+'</div>':'')+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Gebucht.'+(ds.length?'':' Weitere Infos bekommst du per E-Mail.')+'</div>'+dh+'</div>';
   }).join('')+'</div></div>';
 }
 function toggleMsg(pid,did){
@@ -2536,7 +2657,7 @@ function absList(mine,ausById,today,bk){
     if(!closed)return;
     var ref=last?new Date(last+'T12:00:00').getTime():(b.at||0);
     if(Date.now()-ref>60*86400000)return;
-    out.push(b);
+    out.push(Object.assign({},b,{titel:(a&&a.titel)||b.titel||''}));
   });
   return out;
 }
@@ -2544,7 +2665,7 @@ function absagenHTML(list){
   if(!list.length)return '';
   return '<div class="selfwrap"><h2 style="font-size:26px">Deine Bewerbungen</h2><div class="rolegrid" style="margin-top:12px">'+list.map(function(b){
     var nw=!absSeen()[b.projId];
-    return '<div class="role"><b>'+esc(tageStr(b.tage)||'Termin offen')+'</b>'+(nw?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Alle Rollen wurden besetzt.</div></div>';
+    return '<div class="role"><b>'+esc(b.titel||'Projekt')+'</b>'+(nw?' <span class="pill" style="background:var(--ink);color:var(--bg)">Neu</span>':'')+'<div class="cm">'+esc(tageStr(b.tage)||'Termin offen')+'</div>'+(b.ort?'<div class="cl">'+esc(b.ort)+'</div>':'')+(b.rolle?'<div style="margin-top:6px"><span class="pill">Rolle</span> '+esc(b.rolle)+'</div>':'')+'<div class="cl" style="margin-top:6px">Alle Rollen wurden besetzt.</div></div>';
   }).join('')+'</div></div>';
 }
 function absKey(){return 'abs-seen-'+uid}
@@ -2594,7 +2715,7 @@ async function loadAnfragen(){
           else btn='<button type="button" class="btn small primary" data-act="bew" data-k="'+esc(key)+'">Bewerben</button>';
           return '<div style="margin-top:6px"><span class="pill">'+esc(r.typ||'Rolle')+'</span> '+(r.anzahl?'<span class="cm">× '+r.anzahl+'</span> ':'')+esc(r.name||'')+'<div class="cl">'+esc((r.krit||[]).filter(function(x){return x!==r.typ}).join(' · '))+(r.beschr?(r.krit&&r.krit.length?' · ':'')+esc(r.beschr):'')+'</div>'+(btn?'<div style="margin-top:6px">'+btn+'</div>':'')+'</div>';
         }).join('');
-        return '<div class="role"><b>'+esc(tg||'Termin offen')+'</b>'+(a.ort?'<div class="cl">'+esc(a.ort)+'</div>':'')+(a.gage?'<div class="cl">Gage: '+esc(a.gage)+'</div>':'')+rl+'</div>';
+        return '<div class="role"><b>'+esc(a.titel||'Projekt')+'</b><div class="cm">'+esc(tg||'Termin offen')+'</div>'+(a.ort?'<div class="cl">'+esc(a.ort)+'</div>':'')+(a.gage?'<div class="cl">Gage: '+esc(a.gage)+'</div>':'')+rl+'</div>';
       }).join('')+'</div></div>';
       state.anfList=arr;
     }
@@ -2642,6 +2763,7 @@ async function removeProj(){
   var pr=curProj();if(!pr)return;
   try{
     await db.doc('projekte/'+pr.id).delete();
+    logEv('Projekt „'+(pr.name||'Ohne Namen')+'“ gelöscht');
     if(isAdmin){syncAusschreibung(pr.id,null);Object.keys(pr.auswahl||{}).forEach(function(k){if(pr.auswahl[k].st==='gebucht'){try{db.doc('buchungen/'+k+'/e/'+pr.id).delete().catch(function(){})}catch(e){}}})}
     if(role==='kunde'){try{var kq=await db.collection('kunden/'+uid+'/auswahl').get();for(var qi=0;qi<kq.docs.length;qi++){if((kq.docs[qi].data()||{}).projId===pr.id)await db.doc('kunden/'+uid+'/auswahl/'+kq.docs[qi].id).delete()}}catch(e){}}
     state.projects=state.projects.filter(function(x){return x.id!==pr.id});
@@ -2651,6 +2773,7 @@ async function removeProj(){
 
 /* ---------- Start ---------- */
 async function start(){
+  if(role==='bewerber')touchActive();
   var who=$('#whoami');if(who)who.textContent=(myName||myEmail)+(ctx.mode==='local'?' · Testmodus':'');
   if(role==='admin'){
     renderList();refreshPanel(true);
@@ -2729,7 +2852,7 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-const APP_VERSION = '1.8.26 (25.10.2026)';
+const APP_VERSION = '1.9.28 (26.10.2026)';
 (function(){var e=document.getElementById('appver');if(e)e.textContent='Version '+APP_VERSION;})();
 let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
