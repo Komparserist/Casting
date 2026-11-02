@@ -290,6 +290,34 @@ legend{font-family:var(--f-display);font-size:20px;font-weight:700;text-transfor
 .bltab th{font-size:12.5px;text-transform:uppercase;letter-spacing:.08em}
 @media print{body.printlist{overflow:visible!important}body.printlist *{visibility:hidden!important}body.printlist #sheet,body.printlist #sheet *{visibility:visible!important}body.printlist .scrim{position:static!important;background:none!important;display:block!important;padding:0!important}body.printlist #sheet{position:absolute;left:0;top:0;width:100%;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;animation:none!important;border-radius:0!important}body.printlist #sheet .noprint,body.printlist #sheet .sh .x{display:none!important}}
 
+.pj.gone,.pcard .gonemsg{opacity:.62}
+.pj.gone{background:var(--line,#eee);border-style:dashed}
+.pj.gone h3{text-decoration:line-through}
+.gonemsg{margin:12px 4px 0;padding:10px 12px;border:1px dashed var(--line,#ccc);border-radius:10px;background:var(--surface,#f6f6f6)}
+.plt{width:104px!important}
+.plul{margin:4px 0 4px 18px;padding:0}
+.plul li{margin:2px 0}
+.booklist h4{font-size:16px}
+
+.aview{margin-top:10px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.ftile{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--line,#ddd)}
+.fph{display:block;width:100%;height:100%;padding:0;margin:0;border:0;background:none;cursor:pointer;color:inherit}
+.fph img{width:100%;height:100%;object-fit:cover;display:block}
+.fph:focus-visible{outline:3px solid var(--accent,#06c);outline-offset:-3px}
+.fini{display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:42px;font-weight:600}
+.fbadge{position:absolute;left:6px;top:6px;right:70px;display:flex;flex-wrap:wrap;gap:4px;pointer-events:none}
+.fbadge .score,.fbadge .frl{background:rgba(255,255,255,.92);color:#111;border-radius:8px;padding:2px 7px;font-size:12px}
+.ftr{position:absolute;right:6px;top:6px}
+.fok{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.92);color:#111;border-radius:8px;padding:3px 7px;font-size:12px}
+.fbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:26px 8px 8px;background:linear-gradient(transparent,rgba(0,0,0,.7))}
+.fbar .btn{flex:1;min-height:42px;justify-content:center;background:#fff;color:#111;border-color:#fff;font-size:18px}
+.fbar .btn.primary{background:var(--accent,#06c);color:#fff;border-color:var(--accent,#06c)}
+.fbar .btn.danger{background:#b3261e;color:#fff;border-color:#b3261e}
+.navbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:8px 0 4px;padding:6px 0;border-bottom:1px solid var(--line,#ddd)}
+.fbar .btn{font-size:14px}
+.fbar [data-act=kdec]{font-size:22px}
+
 </style>
 </head>
 <body>
@@ -981,6 +1009,159 @@ function logEv(typ,text,ref){
   var fail=function(){if(Date.now()-LOGWARN>60000){LOGWARN=Date.now();toast('Der Protokolleintrag konnte nicht gespeichert werden.')}};
   try{db.collection('protokoll').doc().set(rec).catch(fail)}catch(e){fail()}
 }
+/* ---------- Auswahlansicht: Karten oder Fotos, Weiter/Zurück im Profil ---------- */
+function aviewGet(){try{return localStorage.getItem('casting-aview')==='fotos'?'fotos':'karten'}catch(e){return 'karten'}}
+function aviewIsFotos(){if(!state.aview)state.aview=aviewGet();return state.aview==='fotos'}
+function aviewToggle(){
+  var f=aviewIsFotos();
+  return '<div class="chips aview" role="group" aria-label="Ansicht der Auswahl"><button type="button" class="chip'+(f?'':' on')+'" data-act="aview" data-v="karten" aria-pressed="'+(!f)+'">Karten</button><button type="button" class="chip'+(f?' on':'')+'" data-act="aview" data-v="fotos" aria-pressed="'+f+'">Fotos</button></div>';
+}
+function fotoKachel(thumb,ini,openAttrs,badge,bar,label,topRight){
+  return '<div class="ftile"><button type="button" class="fph" '+openAttrs+' aria-label="Profil von '+esc(label)+' öffnen">'+(thumb?'<img alt="" loading="lazy" src="'+esc(thumb)+'">':'<span class="fini">'+esc(ini)+'</span>')+'</button>'+
+    (badge?'<div class="fbadge">'+badge+'</div>':'')+(topRight?'<div class="ftr">'+topRight+'</div>':'')+(bar?'<div class="fbar">'+bar+'</div>':'')+'</div>';
+}
+function navStart(t,kind,key){
+  var g=t.closest('[data-navgrp]');if(!g){state.nav=null;return}
+  var keys=Array.prototype.map.call(g.querySelectorAll('[data-act="'+kind+'"]'),function(e){return kind==='open'?e.dataset.id:e.dataset.key});
+  state.nav={kind:kind,keys:keys,i:keys.indexOf(key)};
+}
+function navBar(){
+  var n=state.nav;if(!n||n.keys.length<2||n.i<0)return;
+  var sh=$('#sheet .sh');if(!sh)return;
+  var old=$('#sheet .navbar');if(old)old.remove();
+  var bar=document.createElement('div');bar.className='navbar noprint';
+  bar.innerHTML='<button type="button" class="btn small" data-act="navprev"'+(n.i<=0?' disabled':'')+'>← Zurück</button><span class="cl">'+(n.i+1)+' von '+n.keys.length+'</span><button type="button" class="btn small" data-act="navnext"'+(n.i>=n.keys.length-1?' disabled':'')+'>Weiter →</button>';
+  sh.insertAdjacentElement('afterend',bar);
+}
+function navGo(d){
+  var n=state.nav;if(!n)return;
+  var ni=n.i+d;if(ni<0||ni>=n.keys.length)return;
+  n.i=ni;var key=n.keys[ni],lf=lastFocus;
+  if(n.kind==='open'){var p=findP(key);if(!p)return;openSheet(detailHTML(p,false,true));startDetail(p)}
+  else kProfil(key);
+  lastFocus=lf;navBar();
+  var b=$('#sheet [data-act="'+(d>0?'navnext':'navprev')+'"]')||$('#sheet [data-act="navnext"]')||$('#sheet [data-act="navprev"]');
+  if(b&&!b.disabled)b.focus();
+}
+/* ---------- Projektprotokoll (plog): unveränderlich, bleibt nach dem Löschen im Archiv ---------- */
+function tms(v){return v&&v.toMillis?v.toMillis():(+v||0)}
+function fmtDT(ms){if(!ms)return '';var d=new Date(ms),z=function(n){return (n<10?'0':'')+n};return z(d.getDate())+'.'+z(d.getMonth()+1)+'.'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes())}
+function logP(projId,typ,text,extra,kv){
+  if(!db||!uid||!projId)return Promise.resolve();
+  var rec={at:db.serverTime||Date.now(),by:uid,name:myName||myEmail||'',rolle:role,typ:typ,text:String(text).slice(0,400),kv:!!kv};
+  extra=extra||{};
+  ['pid','pname','rolleName','von','nach','personen','nachtrag','atOrig'].forEach(function(k){if(extra[k]!=null)rec[k]=extra[k]});
+  var fail=function(){if(Date.now()-LOGWARN>60000){LOGWARN=Date.now();toast('Der Protokolleintrag konnte nicht gespeichert werden.')}};
+  try{return db.collection('plog/'+projId+'/e').doc().set(rec).catch(fail)}catch(e){fail();return Promise.resolve()}
+}
+var PFIELDS=[['name','Name'],['anzeigename','Anzeigename'],['produktion','Produktion'],['art','Art'],['ort','Drehort'],['gage','Gage'],['notiz','Notiz'],['regieName','Ansprechperson'],['regieMail','E-Mail der Ansprechperson'],['regieTel','Telefon der Ansprechperson'],['tage','Drehtage']];
+function plogProjSaved(projId,old,rec,rollen){
+  var wer=role==='admin'?'Agentur':'Produktion';
+  if(!old){
+    logP(projId,'projekt.angelegt','Projekt „'+rec.name+'“ erstellt ('+wer+(myName?', '+myName:'')+')',{},true);
+    rollen.forEach(function(r){var n=r.name||'Rolle';logP(projId,'rolle.neu','Anfrage für '+(r.anzahl||1)+' „'+n+'“ erstellt',{rolleName:n,nach:String(r.anzahl||1)},true)});
+    return;
+  }
+  var ch=PFIELDS.filter(function(f){return JSON.stringify(old[f[0]]||'')!==JSON.stringify(rec[f[0]]||'')}).map(function(f){return f[1]});
+  if(ch.length)logP(projId,'projekt.geaendert','Projekt geändert: '+ch.join(', '),{},true);
+  var om={},nm={};(old.rollen||[]).forEach(function(r){om[r.id]=r});rollen.forEach(function(r){nm[r.id]=r});
+  rollen.forEach(function(r){
+    var n=r.name||'Rolle',o=om[r.id];
+    if(!o){logP(projId,'rolle.neu','Neue Rolle hinzugefügt: „'+n+'“ ('+(r.anzahl||1)+')',{rolleName:n,nach:String(r.anzahl||1)},true);return}
+    var parts=[],ex={rolleName:n};
+    if((o.name||'')!==(r.name||''))parts.push('Name von „'+(o.name||'–')+'“ auf „'+(r.name||'–')+'“');
+    if((+o.anzahl||0)!==(+r.anzahl||0)){parts.push('Anzahl von '+(o.anzahl||1)+' auf '+(r.anzahl||1));ex.von=String(o.anzahl||1);ex.nach=String(r.anzahl||1)}
+    var other=ROLEF.filter(function(f){return f.k!=='name'&&f.k!=='anzahl'&&JSON.stringify(o[f.k]||'')!==JSON.stringify(r[f.k]||'')});
+    if(other.length)parts.push('Anforderungen geändert ('+other.map(function(f){return f.l}).join(', ')+')');
+    if(parts.length)logP(projId,'rolle.geaendert','Rolle „'+n+'“ geändert: '+parts.join('; '),ex,true);
+  });
+  Object.keys(om).forEach(function(id){if(!nm[id])logP(projId,'rolle.entfernt','Rolle „'+(om[id].name||'Rolle')+'“ entfernt',{rolleName:om[id].name||'Rolle'},true)});
+}
+async function plogEntries(projId){
+  var q=db.collection('plog/'+projId+'/e');
+  if(!isAdmin)q=q.where('kv','==',true);
+  var sn=await q.get();
+  return sn.docs.map(function(d){var o=Object.assign({},d.data()||{},{id:d.id});o.eff=o.atOrig||tms(o.at);return o}).sort(function(a,b){return a.eff-b.eff});
+}
+function plogMissing(pr,entries){
+  var has=function(t){return entries.some(function(e){return e.typ===t})},L=[],sel=pr.auswahl||{},nm=pr.name||'Ohne Namen';
+  var pn=function(id){return pName(findP(id))};
+  if(pr.createdAt&&!has('projekt.angelegt'))L.push({typ:'projekt.angelegt',text:'Projekt „'+nm+'“ erstellt'+(pr.ersteller?(pr.erstellerName?' ('+pr.erstellerName+')':' (Produktion)'):' (Agentur)'),at:pr.createdAt,kv:true,extra:{}});
+  if(!has('rolle.neu'))(pr.rollen||[]).forEach(function(r){var n=r.name||'Rolle';L.push({typ:'rolle.neu',text:'Anfrage für '+(r.anzahl||1)+' „'+n+'“ erstellt',at:pr.createdAt||0,kv:true,extra:{rolleName:n,nach:String(r.anzahl||1)}})});
+  var sent=Object.keys(sel).filter(function(id){var st=sel[id].st;return sel[id].sentAt&&st&&st!=='auswahl'});
+  if(sent.length&&!has('auswahl.gesendet'))L.push({typ:'auswahl.gesendet',text:'Auswahl an Produktion gesendet: '+sent.length+' Darsteller',at:Math.min.apply(null,sent.map(function(id){return sel[id].sentAt})),kv:true,extra:{personen:sent.map(function(id){return {pid:id,name:pn(id),rolle:sel[id].rolle||''}})}});
+  if(pr.kundeAntwortAt&&!has('auswahl.entschieden')){
+    var dec=Object.keys(state.decAll||{}).map(function(k){return state.decAll[k]}).filter(function(d){return d.projId===pr.id&&isFinal(d)});
+    L.push({typ:'auswahl.entschieden',text:'Produktion hat entschieden'+(dec.length?': '+dec.filter(function(d){return d.status==='bestaetigt'}).length+' bestätigt, '+dec.filter(function(d){return d.status==='abgelehnt'}).length+' abgelehnt':''),at:pr.kundeAntwortAt,kv:true,extra:dec.length?{personen:dec.map(function(d){return {pid:d.pid,name:pn(d.pid),rolle:d.rolle||'',s:d.status}})}:{}});
+  }
+  Object.keys(sel).forEach(function(id){
+    if(sel[id].st!=='gebucht')return;
+    if(entries.some(function(e){return e.typ==='buchung.gebucht'&&e.pid===id}))return;
+    var r=sel[id].rolle||'';
+    L.push({typ:'buchung.gebucht',text:'„'+pn(id)+'“'+(r?' als „'+r+'“':'')+' gebucht',at:sel[id].at||pr.updatedAt||0,kv:true,extra:{pid:id,pname:pn(id),rolleName:r}});
+  });
+  if(pr.geloescht&&!has('projekt.geloescht'))L.push({typ:'projekt.geloescht',text:'Projekt gelöscht',at:pr.geloeschtAm||0,kv:true,extra:{}});
+  return L;
+}
+async function plogFill(pr){
+  var en=await plogEntries(pr.id),miss=plogMissing(pr,en);
+  for(var i=0;i<miss.length;i++){var m=miss[i];var ex=Object.assign({nachtrag:true},m.extra);if(m.at)ex.atOrig=m.at;await logP(pr.id,m.typ,m.text,ex,m.kv)}
+  return miss.length;
+}
+function plogBooked(entries){
+  var m={};
+  entries.forEach(function(e){
+    if(e.typ==='buchung.gebucht'&&e.pid)m[e.pid]={name:e.pname||'Unbekannt',rolle:e.rolleName||'',at:e.eff};
+    else if(e.typ==='buchung.storniert'&&e.pid)delete m[e.pid];
+  });
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return String(a.rolle).localeCompare(String(b.rolle),'de')||String(a.name).localeCompare(String(b.name),'de')});
+}
+function plogHTML(){
+  var c=state.plogCur,en=c.entries,bk=plogBooked(en);
+  var h='<div class="sh"><h2 id="sheetTitle">Protokoll</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div>';
+  h+='<div class="booklist"><h3>'+esc(c.title)+'</h3>';
+  h+='<h4 style="margin:14px 0 4px">Gebucht ('+bk.length+')</h4>';
+  if(!bk.length)h+='<p class="cl">Noch niemand gebucht.</p>';
+  else h+='<table class="bltab"><thead><tr><th>Rolle</th><th>Name</th><th>Gebucht am</th></tr></thead><tbody>'+bk.map(function(b){return '<tr><td>'+esc(b.rolle||'–')+'</td><td>'+esc(b.name)+'</td><td>'+esc(fmtDT(b.at))+'</td></tr>'}).join('')+'</tbody></table>';
+  h+='<h4 style="margin:18px 0 4px">Verlauf ('+en.length+')</h4>';
+  if(!en.length)h+='<p class="cl">Noch keine Einträge.</p>';
+  en.forEach(function(e){
+    var wer=e.rolle==='admin'?'Agentur':'Produktion';
+    if(!isAdmin&&e.rolle==='admin')wer='Agentur';else if(e.name)wer+=', '+e.name;
+    var pl=(e.personen||[]);
+    h+='<div class="logrow"><span class="cm plt">'+esc(fmtDT(e.eff))+'</span><div><div>'+esc(e.text||'')+'</div>'+
+      (pl.length?'<details><summary class="cl">'+pl.length+' Darsteller anzeigen</summary><ul class="plul">'+pl.map(function(x){return '<li>'+esc(x.name||'Unbekannt')+(x.rolle?' – '+esc(x.rolle):'')+(x.s?' – '+(x.s==='bestaetigt'?'bestätigt':'abgelehnt'):'')+'</li>'}).join('')+'</ul></details>':'')+
+      '<div class="cl">'+esc(wer)+(e.nachtrag?' · nachgetragen aus vorhandenen Daten':'')+'</div></div></div>';
+  });
+  h+='</div><div class="acts noprint" style="margin-top:14px"><button type="button" class="btn primary" data-act="plogcsv">Als Tabelle herunterladen (CSV)</button><button type="button" class="btn" data-act="blprint">Drucken</button>';
+  if(isAdmin&&c.pr&&!c.pr.geloeschtEndgueltig){var mi=plogMissing(c.pr,en).length;if(mi)h+='<button type="button" class="btn" data-act="plogfill">Aus bestehenden Daten ergänzen ('+mi+')</button>'}
+  h+='</div><p class="cl noprint" style="margin:8px 0 0">Das Protokoll kann nicht geändert oder gelöscht werden.'+(isAdmin?'':' Du siehst die Schritte, die dein Projekt betreffen.')+'</p>';
+  return h;
+}
+async function openPlog(projId,title){
+  if(!db)return;
+  var pr=state.projects.filter(function(x){return x.id===projId})[0]||null;
+  openSheet('<div class="sh"><h2 id="sheetTitle">Protokoll</h2><button type="button" class="x" data-act="close" aria-label="Schließen" data-first>×</button></div><p class="cl">Wird geladen …</p>');
+  try{
+    var en=await plogEntries(projId);
+    state.plogCur={id:projId,title:title||(pr&&pr.name)||'Projekt',entries:en,pr:pr};
+    $('#sheet').innerHTML=plogHTML();
+  }catch(e){$('#sheet').innerHTML='<div class="sh"><h2 id="sheetTitle">Protokoll</h2><button type="button" class="x" data-act="close" aria-label="Schließen">×</button></div><p class="cl">Das Protokoll konnte nicht geladen werden.'+esc(errWhy(e))+'</p>'}
+}
+function csvCell(v){v=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}
+function plogCSV(){
+  var c=state.plogCur,rows=[['Datum','Uhrzeit','Ereignis','Person','Rolle','Status','Von','Nachgetragen']];
+  c.entries.forEach(function(e){
+    var d=new Date(e.eff),z=function(n){return (n<10?'0':'')+n},dat=z(d.getDate())+'.'+z(d.getMonth()+1)+'.'+d.getFullYear(),zt=z(d.getHours())+':'+z(d.getMinutes());
+    var wer=e.rolle==='admin'?'Agentur':'Produktion';
+    if((e.personen||[]).length)e.personen.forEach(function(x){rows.push([dat,zt,e.text,x.name||'',x.rolle||'',x.s?(x.s==='bestaetigt'?'bestätigt':'abgelehnt'):'',wer,e.nachtrag?'ja':''])});
+    else rows.push([dat,zt,e.text,e.pname||'',e.rolleName||'',e.von?e.von+' → '+e.nach:'',wer,e.nachtrag?'ja':'']);
+  });
+  var txt='﻿'+rows.map(function(r){return r.map(csvCell).join(';')}).join('\r\n');
+  var blob=new Blob([txt],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='protokoll-'+String(c.title).replace(/[^\wäöüÄÖÜß-]+/g,'_').slice(0,40)+'-'+todayStr()+'.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+}
 function pName(p){return p?(fullName(p)||'Ohne Namen'):'Unbekannt'}
 function cardHTML(p,extra){
   var age=ageOf(p);
@@ -1078,7 +1259,7 @@ function closeSheet(){
   $('#scrim').hidden=true;
   $('#sheet').innerHTML='';
   document.body.style.overflow='';
-  state.photoEdits={};state.photoDocs={};state.photoLoad=null;state.gallery=[];state.detailLoad=null;state.pdraft=null;
+  state.photoEdits={};state.photoDocs={};state.photoLoad=null;state.gallery=[];state.detailLoad=null;state.pdraft=null;state.nav=null;
   if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}
 }
 function toast(msg){
@@ -1311,7 +1492,10 @@ document.addEventListener('click',function(e){
   else if(act==='chip'){var s=state.f.sets[t.dataset.g],v=t.dataset.v;if(s.has(v))s.delete(v);else s.add(v);t.classList.toggle('on',s.has(v));t.setAttribute('aria-pressed',String(s.has(v)));renderList()}
   else if(act==='toggle'){var k=t.dataset.t;state.f.t[k]=!state.f.t[k];t.classList.toggle('on',state.f.t[k]);t.setAttribute('aria-pressed',String(state.f.t[k]));renderList()}
   else if(act==='clear'){state.f=newFilters();state.q='';$('#q').value='';refreshPanel(true);renderList()}
-  else if(act==='open'){var p=findP(id);if(p){var ro=!!t.closest('#v-proj');openSheet(detailHTML(p,false,ro));startDetail(p)}}
+  else if(act==='open'){var p=findP(id);if(p){var ro=!!t.closest('#v-proj');navStart(t,'open',id);openSheet(detailHTML(p,false,ro));startDetail(p);navBar()}}
+  else if(act==='navprev'){navGo(-1)}
+  else if(act==='navnext'){navGo(1)}
+  else if(act==='aview'){state.aview=t.dataset.v==='fotos'?'fotos':'karten';try{localStorage.setItem('casting-aview',state.aview)}catch(e){}if(state.view==='kunde')renderKunde();else renderProj()}
   else if(act==='avail'){var ap=findP(id),sec=$('#availsec');if(ap&&sec&&state.cal){sec.innerHTML='<h3>Verfügbarkeit ändern</h3>'+calHTML(ap,true);sec.scrollIntoView({block:'start'});t.hidden=true}}
   else if(act==='khok'){state.kHintHide=true;renderKunde()}
   else if(act==='khnever'){state.kHintHide=true;try{localStorage.setItem(kHintKey(),'1')}catch(e){}renderKunde()}
@@ -1345,7 +1529,7 @@ document.addEventListener('click',function(e){
   else if(act==='oktoggle'){var op2=curProj();if(op2){var m2=Object.assign({},op2.auswahl||{});if(m2[id]){m2[id]=Object.assign({},m2[id],{ok:m2[id].ok===false});saveSel(op2,m2)}}}
   else if(act==='unsel'){removeSel(id)}
   else if(act==='kdec'){kDecide(t.dataset.key,t.dataset.s)}
-  else if(act==='kopen'){kProfil(t.dataset.key)}
+  else if(act==='kopen'){navStart(t,'kopen',t.dataset.key);kProfil(t.dataset.key);navBar()}
   else if(act==='kgal'){$('#lb').hidden=false;showGal(+t.dataset.i)}
   else if(act==='ksend'){state.kSendConf=t.dataset.id;renderKunde()}
   else if(act==='ksendno'){state.kSendConf='';renderKunde()}
@@ -1385,7 +1569,12 @@ document.addEventListener('click',function(e){
   else if(act==='pedit'){var cp0=curProj();if(cp0)openProjForm(cp0)}
   else if(act==='pdel'){state.confirmDelP=true;renderProj()}
   else if(act==='pdelno'){state.confirmDelP=false;renderProj()}
-  else if(act==='pdelok'){removeProj()}
+  else if(act==='pdelok'){var dpr=curProj();if(dpr&&dpr.geloescht)hardDeleteProj();else removeProj()}
+  else if(act==='prestore'){restoreProj()}
+  else if(act==='plog'){openPlog(id,t.dataset.t)}
+  else if(act==='archopen'){openPlog(id,t.dataset.t)}
+  else if(act==='plogcsv'){plogCSV()}
+  else if(act==='plogfill'){var fc=state.plogCur;if(fc&&fc.pr){t.disabled=true;plogFill(fc.pr).then(function(){return openPlog(fc.id,fc.title)})}}
   else if(act==='prole'){state.roleSel=t.dataset.r||'';renderProj()}
   else if(act==='merk'){addSel(id)}
   else if(act==='ptadd'){state.pdraft.tage.push({von:'',bis:''});rerenderProjForm('pt-v'+(state.pdraft.tage.length-1))}
@@ -1398,6 +1587,11 @@ document.addEventListener('click',function(e){
     removeExamples();
   }
 });
+(function(){
+  var sx=0,sy=0,ok=false;
+  document.addEventListener('touchstart',function(e){var sh=e.target.closest&&e.target.closest('#sheet');ok=!!(sh&&state.nav&&!e.target.closest('.pthumbs,input,textarea,select,.cal,.navbar'));if(ok){sx=e.touches[0].clientX;sy=e.touches[0].clientY}},{passive:true});
+  document.addEventListener('touchend',function(e){if(!ok)return;ok=false;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)>70&&Math.abs(dy)<45)navGo(dx<0?1:-1)},{passive:true});
+})();
 document.addEventListener('keydown',function(e){
   var lbOpen=!$('#lb').hidden;
   if(lbOpen&&e.key==='ArrowLeft'){showGal(state.galIdx-1);return}
@@ -1604,6 +1798,7 @@ async function sendDispo(){
     }
     dd.text='';
     logEv('dispo.gesendet','Dispo für Projekt „'+(pr.name||'Ohne Namen')+'“ an '+ids.length+' Darsteller gesendet',{projId:pr.id});
+    logP(pr.id,'dispo.gesendet','Dispo an '+ids.length+' Darsteller gesendet',{},false);
     toast('Dispo an '+(ids.length-noApp)+' Darsteller gesendet'+(noApp?'. '+noApp+' ohne App-Konto: bitte per E-Mail schicken.':''));
     state.dSending=false;
     renderProj();loadDispo(pr);
@@ -2227,7 +2422,7 @@ function kHint(){
   return '<div class="selfwrap" style="padding-top:0"><div class="hint" role="note"><p>'+esc(KHINT_TXT)+'</p><div class="acts" style="border:0;padding:0;margin-top:10px"><button type="button" class="btn primary" data-act="khok">OK</button><button type="button" class="btn" data-act="khnever">Nicht nochmal anzeigen</button></div></div></div>';
 }
 /* ---------- Projekte: Liste mit Reitern, Suche, Sortierung, Firmenfilter ---------- */
-var PTABS=[['neu','Neue Projekte'],['mit','Mit Auswahl'],['voll','Ausgebucht'],['abg','Abgeschlossen']];
+var PTABS=[['neu','Neue Projekte'],['mit','Mit Auswahl'],['voll','Ausgebucht'],['abg','Abgeschlossen'],['del','Gelöscht']];
 function firmOf(pr){return pr.produktion||pr.erstellerName||'Ohne Firma'}
 function bookedCount(pr,r){
   var sel=pr.auswahl||{},n=0,single=(pr.rollen||[]).length===1;
@@ -2240,6 +2435,7 @@ function bookedCount(pr,r){
   return n;
 }
 function projStatus(pr){
+  if(pr.geloescht)return 'del';
   var days=projDays(pr),t=todayStr(),sel=pr.auswahl||{},roles=pr.rollen||[];
   if(days.length&&days[days.length-1]<t)return 'abg';
   if(roles.length&&roles.every(function(r){return bookedCount(pr,r)>=(+r.anzahl||1)}))return 'voll';
@@ -2300,16 +2496,19 @@ function bookListHTML(pr){
   return h;
 }
 function wartetAufKunde(pr){
-  if(!pr.kundeId||projStatus(pr)==='abg')return 0;
+  if(!pr.kundeId||projStatus(pr)==='abg'||projStatus(pr)==='del')return 0;
   var sel=pr.auswahl||{},t=0,since=pr.kundeAntwortAt||0;
   Object.keys(sel).forEach(function(id){var e=sel[id];if(e.st==='gesendet'&&e.sentAt&&e.sentAt>since&&(!t||e.sentAt<t))t=e.sentAt});
   if(!t)return 0;
   var days=Math.floor((Date.now()-t)/864e5);
   return days>=3?days:0;
 }
-function neueAntwort(pr){return !!pr.kundeAntwortAt&&pr.kundeAntwortAt>(pr.adminGesehenAt||0)}
+function neueAntwort(pr){return !!pr.kundeAntwortAt&&!pr.geloescht&&pr.kundeAntwortAt>(pr.adminGesehenAt||0)}
 function updateProjDot(){var el=$('#pdot');if(el)el.hidden=!state.projects.some(function(x){return neueAntwort(x)||bewNew(x)>0||wartetAufKunde(x)>0})}
+function delWho(pr){return pr.geloeschtVon&&pr.geloeschtVon===pr.kundeId?'Produktion':'Agentur'}
+function bookedN(pr){return Object.keys(pr.auswahl||{}).filter(function(k){return (pr.auswahl[k]||{}).st==='gebucht'}).length}
 function projCardHTML(pr){
+  if(pr.geloescht){var bn=bookedN(pr);return '<button type="button" class="pj gone" data-act="popen" data-id="'+esc(pr.id)+'"><h3>'+esc(pr.name||'Ohne Namen')+'</h3><div class="cm">'+esc([firmOf(pr)!=='Ohne Firma'?firmOf(pr):'',pr.ort].filter(Boolean).join(' · '))+'</div><div class="cl">Gelöscht von '+delWho(pr)+(pr.geloeschtAm?' am '+esc(fmtDT(pr.geloeschtAm)):'')+'</div>'+(bn?'<div style="margin-top:6px"><span class="warn">Hatte '+bn+' Buchung'+(bn===1?'':'en')+' – bitte prüfen</span></div>':'')+'</button>'}
   var tg=tageStr(pr.tage),sel=pr.auswahl||{},ids=Object.keys(sel),sent=ids.filter(function(i){return sel[i].st&&sel[i].st!=='auswahl'}).length,draft=ids.length-sent;
   var roles=pr.rollen||[],need=0,have=0;roles.forEach(function(r){var n=+r.anzahl||1;need+=n;have+=Math.min(n,bookedCount(pr,r))});
   var meta=[firmOf(pr)!=='Ohne Firma'?firmOf(pr):'',pr.ort].filter(Boolean).join(' · ');
@@ -2324,7 +2523,7 @@ function projCardHTML(pr){
 }
 function fillPList(){
   var box=$('#plist');if(!box)return;
-  var all=projFiltered(),by={neu:[],mit:[],voll:[],abg:[]};
+  var all=projFiltered(),by={neu:[],mit:[],voll:[],abg:[],del:[]};
   all.forEach(function(pr){by[projStatus(pr)].push(pr)});
   var firms=Array.from(new Set(state.projects.map(firmOf))).sort(function(a,b){return a.localeCompare(b,'de')});
   var fs=$('#pfirma');
@@ -2337,7 +2536,7 @@ function fillPList(){
   if(cur.length)h+=cur.map(projCardHTML).join('');
   else{
     var filt=state.pq||state.pfirma;
-    var msg={neu:'Hier erscheinen Projekte, für die noch keine Auswahl an den Kunden gesendet wurde.',mit:'Hier erscheinen Projekte, bei denen der Kunde schon eine Auswahl bekommen hat.',voll:'Hier erscheinen Projekte, bei denen alle Rollen besetzt sind.',abg:'Hier erscheinen Projekte, deren Drehtage in der Vergangenheit liegen.'}[tab];
+    var msg={neu:'Hier erscheinen Projekte, für die noch keine Auswahl an den Kunden gesendet wurde.',mit:'Hier erscheinen Projekte, bei denen der Kunde schon eine Auswahl bekommen hat.',voll:'Hier erscheinen Projekte, bei denen alle Rollen besetzt sind.',del:'Hier erscheinen gelöschte Projekte. Nur du kannst sie wiederherstellen oder endgültig löschen. Das Protokoll bleibt immer erhalten.',abg:'Hier erscheinen Projekte, deren Drehtage in der Vergangenheit liegen.'}[tab];
     h+='<div class="empty" style="margin-top:12px"><h3>'+(filt?'Nichts gefunden':'Keine Projekte')+'</h3><p>'+(filt?'In diesem Reiter passt kein Projekt zu Suche und Firmenfilter. Schau in den anderen Reitern nach.':msg)+'</p></div>';
   }
   box.innerHTML=h;
@@ -2366,13 +2565,19 @@ function renderProjDetail(){
   var days=projDays(pr),roles=pr.rollen||[];
   var wk=wartetAufKunde(pr);
   if(wk)h+='<p class="warn" role="status" style="margin:10px 4px 0">Erinnerung: Die Produktion hat seit '+wk+' Tagen nicht auf die Vorschläge geantwortet.'+(pr.regieMail?' <a href="mailto:'+esc(pr.regieMail)+'?subject='+encodeURIComponent('Vorschläge zu '+(pr.anzeigename||pr.name||'Projekt'))+'">Per E-Mail nachfragen</a>':'')+'</p>';
-  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen'}[projStatus(pr)])+'</span>'+(pr.art?' <span class="cl">'+esc(pr.art)+'</span>':'')+(!pr.ersteller?' <span class="cl">Von Agentur eingetragen</span>':'')+'</p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">Endgültig löschen</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':'<button type="button" class="btn" data-act="pdup">Duplizieren</button><button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>')+'</div></div>';
+  h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2><p style="margin:4px 0 0"><span class="pill">'+esc({neu:'Neues Projekt',mit:'Mit Auswahl',voll:'Ausgebucht',abg:'Abgeschlossen',del:'Gelöscht'}[projStatus(pr)])+'</span>'+(pr.art?' <span class="cl">'+esc(pr.art)+'</span>':'')+(!pr.ersteller?' <span class="cl">Von Agentur eingetragen</span>':'')+'</p>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+'</div><div class="topact">'+(state.confirmDelP?'<button type="button" class="btn danger" data-act="pdelok">'+(pr.geloescht?'Ja, endgültig löschen':'Ja, löschen')+'</button><button type="button" class="btn" data-act="pdelno">Abbrechen</button>':(pr.geloescht?'<button type="button" class="btn primary" data-act="prestore">Wiederherstellen</button><button type="button" class="btn danger" data-act="pdel">Endgültig löschen</button>':'<button type="button" class="btn" data-act="pdup">Duplizieren</button><button type="button" class="btn" data-act="pedit">Bearbeiten</button><button type="button" class="btn danger" data-act="pdel">Löschen</button>'))+'</div></div>';
+  if(state.confirmDelP){var bn0=bookedN(pr);h+='<p class="warn" role="alert" style="margin:10px 0 0">'+(pr.geloescht?'Dieses Projekt wird endgültig gelöscht'+(bn0?' und die '+bn0+' Buchung'+(bn0===1?'':'en')+' verschwinde'+(bn0===1?'t':'n')+' aus den Terminen der Darsteller':'')+'. Das Protokoll bleibt im Archiv erhalten.':'Möchtest du dieses Projekt löschen? Es wird grau als „gelöscht“ markiert.'+(bn0?' Achtung: '+bn0+' Darsteller '+(bn0===1?'ist':'sind')+' gebucht. Die Buchungen bleiben bis zum endgültigen Löschen bestehen.':'')+(pr.oeffentlich?' Die öffentliche Ausschreibung wird geschlossen.':''))+'</p>'}
+  h+='<div class="pbar noprint" style="margin:10px 0 0"><button type="button" class="btn small" data-act="plog" data-id="'+esc(pr.id)+'" data-t="'+esc(pr.name||'Projekt')+'">Protokoll öffnen</button></div>';
   h+='<div class="sec" style="margin-top:14px"><h3>Drehtage</h3>'+((pr.tage||[]).filter(function(t){return t.von}).length?'<div class="days">'+(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('')+'</div><p class="cl" style="margin:6px 0 0">'+days.length+' Drehtag'+(days.length===1?'':'e')+' insgesamt</p>':'<span class="cl">Noch keine Drehtage eingetragen</span>')+'</div>';
   if(pr.regieName||pr.regieMail||pr.regieTel||pr.ort)h+='<div class="sec"><h3>Regie und Ort</h3>'+(pr.regieName?'<div class="cm">'+esc(pr.regieName)+'</div>':'')+copyRow(pr.regieMail)+copyRow(pr.regieTel)+(pr.ort?'<div class="cl">Drehort: '+esc(pr.ort)+'</div>':'')+(pr.oeffentlich?'<div class="cl">Für Bewerber sichtbar</div>':'')+'</div>';
   h+='<div class="sec"><h3>Anforderungen</h3>'+(roles.length?'<div class="rolegrid">'+roles.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div>'+(r.beschr?'<div class="cl">'+esc(r.beschr)+'</div>':'')+'</div>'}).join('')+'</div>':'<span class="cl">Keine Rollen angelegt, es werden alle Profile nach Verfügbarkeit gezeigt.</span>')+'</div>';
   if(pr.gage)h+='<div class="sec"><h3>Gage</h3><div class="cm">'+esc(pr.gage)+'</div></div>';
   if(pr.notiz)h+='<div class="sec"><h3>Notizen</h3><div class="notes">'+esc(pr.notiz)+'</div></div>';
   h+='</div>';
+  if(pr.geloescht){
+    h+='<p class="gonemsg" role="status">Gelöscht von '+delWho(pr)+(pr.geloeschtAm?' am '+esc(fmtDT(pr.geloeschtAm)):'')+'. Nichts mehr änderbar. Du kannst das Projekt wiederherstellen oder endgültig löschen.</p>';
+    host.innerHTML=h;return;
+  }
   var rs=roles.length?roles:[{id:'_',name:'',anzahl:null}];
   if(state.roleSel&&!roles.some(function(r){return r.id===state.roleSel}))state.roleSel='';
   if(roles.length>1){
@@ -2393,10 +2598,12 @@ function renderProjDetail(){
   var byName=function(x,y){return String(x.p.nachname||'').localeCompare(String(y.p.nachname||''),'de')||String(x.p.vorname||'').localeCompare(String(y.p.vorname||''),'de')};
   Object.keys(groups).forEach(function(k){groups[k].sort(function(x,y){return (y.a&&x.a?y.a.free-x.a.free:0)||byName(x,y)})});
   var selIds=Object.keys(sel).filter(function(id){return findP(id)&&effSt(pr,id)!=='abgelehnt'}),nOpen=selIds.filter(function(id){return sel[id].st==='auswahl'&&sel[id].ok!==false}).length;
+  var fotosA=aviewIsFotos();
   if(selIds.length){
-    h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Wähle unter „Bearbeiten“ den Kunden aus, um die Auswahl zu senden.</span>')+'</div><div class="grid">'+selIds.map(function(id){
+    h+='<h2 class="mh">Auswahl <small>'+selIds.length+'</small></h2><div class="pbar" style="margin-top:6px">'+(pr.kundeId?'<button type="button" class="btn primary" data-act="send"'+(nOpen?'':' disabled')+'>An Kunden senden ('+nOpen+')</button>':'<span class="cl">Wähle unter „Bearbeiten“ den Kunden aus, um die Auswahl zu senden.</span>')+'</div>'+aviewToggle()+'<div class="'+(fotosA?'fgrid':'grid')+'" data-navgrp="a">'+selIds.map(function(id){
       var p=findP(id),st=effSt(pr,id);
       var bw=sel[id].bew&&st==='auswahl';
+      if(fotosA)return fotoKachel(p.thumb,((p.vorname||'').charAt(0)+(p.nachname||'').charAt(0)).toUpperCase()||'?','data-act="open" data-id="'+esc(id)+'"',statTag(st)+(sel[id].rolle?'<span class="frl">'+esc(sel[id].rolle)+'</span>':''),(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button>',pName(p),st==='auswahl'?'<label class="fok" title="An Kunden senden"><input type="checkbox" data-act="oktoggle" data-id="'+esc(id)+'"'+(sel[id].ok===false?'':' checked')+' aria-label="An Kunden senden"><span>senden</span></label>':'');
       return '<div class="mwrap">'+(st==='auswahl'?'<label class="consent" style="margin:0 0 6px"><input type="checkbox" data-act="oktoggle" data-id="'+esc(id)+'"'+(sel[id].ok===false?'':' checked')+'><span>An Kunden senden</span></label>':'')+personCard(p)+'<div class="mx">'+statTag(st)+(bw?'<span class="score part">hat sich beworben, Zeit bestätigt</span>':'')+(sel[id].rolle?'<span class="cl">Rolle: '+esc(sel[id].rolle)+'</span>':'')+'</div>'+'<div class="pbar" style="margin:0">'+(st==='gebucht'?'':'<button type="button" class="btn small primary" data-act="buchen" data-id="'+esc(id)+'">Buchen</button>')+'<button type="button" class="btn small" data-act="unsel" data-id="'+esc(id)+'">Entfernen</button></div></div>';
     }).join('')+'</div>';
   }
@@ -2508,6 +2715,7 @@ async function saveProj(){
     else if(old&&old.ersteller){rec.ersteller=old.ersteller;if(old.erstellerName)rec.erstellerName=old.erstellerName}
     await ref.set(rec);
     logEv((old?'projekt.geaendert':'projekt.angelegt'),'Projekt „'+rec.name+'“ '+(old?'geändert':'angelegt'),{projId:ref.id});
+    plogProjSaved(ref.id,old,rec,rollen);
     if(isAdmin){syncAusschreibung(ref.id,rec);Object.keys(rec.auswahl||{}).forEach(function(k){if(rec.auswahl[k].st==='gebucht'&&(findP(k)||{}).selbst){try{db.doc('buchungen/'+k+'/e/'+ref.id).update({projName:rec.name}).catch(function(){})}catch(e){}}})}
     state.pid=ref.id;state.roleSel='';if(isAdmin)state.pOpen=true;
     toast('Projekt gespeichert');
@@ -2571,10 +2779,13 @@ function addSel(pid){
 }
 async function removeSel(pid){
   var pr=curProj();if(!pr)return;
+  var was=(pr.auswahl||{})[pid]||{};
   var m=Object.assign({},pr.auswahl||{});delete m[pid];
   if(pr.kundeId){try{await db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+pid).delete()}catch(e){}}
   try{await db.doc('buchungen/'+pid+'/e/'+pr.id).delete()}catch(e){}
   logEv('auswahl.entfernt','„'+pName(findP(pid))+'“ aus der Auswahl von Projekt „'+(pr.name||'Ohne Namen')+'“ entfernt',{projId:pr.id,pid:pid});
+  if(was.st==='gebucht')logP(pr.id,'buchung.storniert','Buchung von „'+pName(findP(pid))+'“'+(was.rolle?' als „'+was.rolle+'“':'')+' aufgehoben',{pid:pid,pname:pName(findP(pid)),rolleName:was.rolle||''},true);
+  else logP(pr.id,'auswahl.entfernt','„'+pName(findP(pid))+'“ aus der Auswahl entfernt',{pid:pid,pname:pName(findP(pid))},false);
   saveSel(pr,m);
   if(pr.oeffentlich)syncAusschreibung(pr.id,Object.assign({},pr,{auswahl:m}));
 }
@@ -2591,12 +2802,16 @@ function bookMail(p,pr,rolle){
 function bookSel(pid){
   var pr=curProj();if(!pr)return;
   var p=findP(pid),m=Object.assign({},pr.auswahl||{});
+  var wasB=(pr.auswahl||{})[pid]&&(pr.auswahl||{})[pid].st==='gebucht';
   m[pid]=Object.assign({},m[pid]||{},{st:'gebucht',at:Date.now()});
-  var rolle=m[pid].rolle||selRole();m[pid].rolle=rolle;if(!m[pid].rolleId)m[pid].rolleId=state.roleSel||'';
+  var rolle=m[pid].rolle||selRole();
+  if(!rolle&&p){var mr=(pr.rollen||[]).filter(function(r){return roleMatch(p,r)});if(mr.length===1){rolle=mr[0].name||'';if(!m[pid].rolleId)m[pid].rolleId=mr[0].id||''}}
+  m[pid].rolle=rolle;if(!m[pid].rolleId)m[pid].rolleId=state.roleSel||'';
   if(p&&p.email){var a=document.createElement('a');a.href=bookMail(p,pr,rolle);document.body.appendChild(a);a.click();a.remove();toast('Gebucht. Die Mail ist vorbereitet, tippe im Mailprogramm auf Senden.')}
   else toast('Als gebucht eingetragen. Im Profil steht keine E-Mail, daher keine Mail.');
   saveSel(pr,m);
   logEv('buchung.gebucht','„'+pName(p)+'“ für Projekt „'+(pr.name||'Ohne Namen')+'“ gebucht',{projId:pr.id,pid:pid});
+  if(!wasB)logP(pr.id,'buchung.gebucht','„'+pName(p)+'“'+(rolle?' als „'+rolle+'“':'')+' gebucht',{pid:pid,pname:pName(p),rolleName:rolle||''},true);
   if(projStatus(Object.assign({},pr,{auswahl:m}))==='voll')logEv('projekt.voll','Projekt „'+(pr.name||'Ohne Namen')+'“ voll besetzt',{projId:pr.id});
   if(pr.oeffentlich)syncAusschreibung(pr.id,Object.assign({},pr,{auswahl:m}));
   if(p&&p.selbst){var bref=db.doc('buchungen/'+pid+'/e/'+pr.id);bref.get().then(function(sn){var o=sn.exists?(sn.data()||{}):{};return bref.set(Object.assign({},o,{projId:pr.id,projName:pr.name||'',rolle:rolle,ort:pr.ort||'',tage:pr.tage||[],at:o.at||Date.now()}))}).catch(function(){toast('Die Buchung konnte dem Bewerber nicht angezeigt werden.')})}
@@ -2619,7 +2834,7 @@ async function sendSel(){
     }
     pr.auswahl=m;
     await db.doc('projekte/'+pr.id).update({auswahl:m,updatedAt:Date.now()});
-    toast(ids.length+' Profil'+(ids.length===1?'':'e')+' an den Kunden gesendet');logEv('auswahl.gesendet','Auswahl für Projekt „'+(pr.name||'Ohne Namen')+'“ an Kunden gesendet ('+ids.length+' Darsteller)',{projId:pr.id});
+    logP(pr.id,'auswahl.gesendet','Auswahl an Produktion gesendet: '+ids.length+' Darsteller',{personen:ids.map(function(id){return {pid:id,name:pName(findP(id)),rolle:m[id].rolle||''}})},true);toast(ids.length+' Profil'+(ids.length===1?'':'e')+' an den Kunden gesendet');logEv('auswahl.gesendet','Auswahl für Projekt „'+(pr.name||'Ohne Namen')+'“ an Kunden gesendet ('+ids.length+' Darsteller)',{projId:pr.id});
   }catch(e){toast('Senden hat nicht geklappt. Versuche es noch einmal.'+errWhy(e))}
   state.sending=false;renderProj();
 }
@@ -2664,7 +2879,15 @@ function drawLog(){
   var f=state.logF||'alle';
   host.innerHTML='<div class="selfwrap"><h2 style="font-size:28px">Protokoll</h2><p class="cl" style="margin:4px 0 0">Änderungen durch die Agentur und durch Produktionen. Änderungen von Bewerbern an ihren eigenen Profilen stehen hier nicht.</p>'+
     '<div class="ptabs" style="margin-top:12px">'+LOGCAT.map(function(c){return '<button type="button" class="chip'+(f===c[0]?' on':'')+'" data-act="logf" data-v="'+c[0]+'" aria-pressed="'+(f===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'+
-    '<div class="fld" style="margin-top:10px"><label for="logq">Suchen (z. B. Projektname)</label><input id="logq" value="'+esc(state.logQ||'')+'" autocomplete="off"></div><div id="logbody">'+logBody()+'</div></div>';
+    '<div class="fld" style="margin-top:10px"><label for="logq">Suchen (z. B. Projektname)</label><input id="logq" value="'+esc(state.logQ||'')+'" autocomplete="off"></div><div id="logbody">'+logBody()+'</div><div id="archbox"></div></div>';
+  fillArchiv();
+}
+async function fillArchiv(){
+  if(!db||!isAdmin||!$('#archbox'))return;
+  if(!state.archiv){try{var sn=await db.collection('plog').get();state.archiv=sn.docs.map(function(d){return Object.assign({id:d.id},d.data()||{})}).filter(function(x){return x.endgueltigAm})}catch(e){state.archiv=[]}}
+  var host=$('#archbox');if(!host)return;
+  var a=state.archiv.slice().sort(function(x,y){return tms(y.endgueltigAm)-tms(x.endgueltigAm)});
+  host.innerHTML='<h3 style="margin:26px 0 6px">Archiv gelöschter Projekte</h3>'+(a.length?a.map(function(x){return '<div class="logrow"><div style="flex:1;min-width:0"><div><b>'+esc(x.name||'Ohne Namen')+'</b>'+(x.produktion?' · '+esc(x.produktion):'')+'</div><div class="cl">Endgültig gelöscht am '+esc(fmtDT(tms(x.endgueltigAm)))+(x.nBuchungen?' · '+x.nBuchungen+' Buchung'+(x.nBuchungen===1?'':'en'):'')+'</div></div><button type="button" class="btn small" data-act="archopen" data-id="'+esc(x.id)+'" data-t="'+esc(x.name||'Projekt')+'">Protokoll öffnen</button></div>'}).join(''):'<p class="cl">Noch keine endgültig gelöschten Projekte.</p>');
 }
 function renderBKonto(){
   $('#count').textContent='Dein Konto';
@@ -2683,13 +2906,14 @@ async function renderKunde(){
   if(state.view!=='kunde')return;
   state.kdocs={};docs.forEach(function(d){state.kdocs[d.key]=d});
   var h='<div class="selfwrap"><h2 style="font-size:30px">Deine Projekte</h2></div>'+kHint()+'<div class="selfwrap" style="padding-top:0"><div class="acts" style="border:0;padding:0;margin-top:12px"><button type="button" class="btn primary" data-act="pnew">Neues Projekt</button></div></div>';
-  var list=state.projects.slice().sort(function(a,b){return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
+  var list=state.projects.slice().sort(function(a,b){if(!!a.geloescht!==!!b.geloescht)return a.geloescht?1:-1;return String(((a.tage||[])[0]||{}).von||'9').localeCompare(String(((b.tage||[])[0]||{}).von||'9'))});
   var kop=state.kOpen&&list.filter(function(p){return p.id===state.kOpen})[0];
   if(!kop){
     state.kOpen='';
     if(!list.length)h+='<div class="empty" style="margin-top:12px"><h3>Noch kein Projekt</h3><p>Tippe auf „Neues Projekt“, um zu beginnen.</p></div>';
     list.forEach(function(pr){
       var tg=(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von)}).join(' · ');
+      if(pr.geloescht){h+='<div class="selfwrap" style="padding-top:0"><button type="button" class="pj gone" data-act="kpopen" data-id="'+esc(pr.id)+'"><h3>'+esc(pr.name||'Ohne Namen')+'</h3><div class="cl">'+esc([pr.produktion,pr.ort].filter(Boolean).join(' · '))+'</div><div style="margin-top:6px"><span class="pill">gelöscht</span></div></button></div>';return}
       var mine=docs.filter(function(d){return d.projId===pr.id}),nOff=mine.filter(function(d){return !isFinal(d)}).length;
       var gb=Object.keys(pr.auswahl||{}).some(function(k){return (pr.auswahl[k]||{}).st==='gebucht'});
       h+='<div class="selfwrap" style="padding-top:0"><button type="button" class="pj" data-act="kpopen" data-id="'+esc(pr.id)+'"><h3>'+esc(pr.name||'Ohne Namen')+'</h3><div class="cl">'+esc([pr.produktion,pr.ort].filter(Boolean).join(' · '))+'</div>'+(tg?'<div class="cl">'+esc(tg)+'</div>':'')+
@@ -2701,9 +2925,12 @@ async function renderKunde(){
   list=[kop];
   list.forEach(function(pr){
     var tg=(pr.tage||[]).filter(function(t){return t.von}).map(function(t){return '<span class="chip">'+(t.bis&&t.bis!==t.von?fmtDMY(t.von)+' – '+fmtDMY(t.bis):fmtDMY(t.von))+'</span>'}).join('');
-    h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+(pr.gage?'<p class="cl" style="margin:4px 0 0">Gage: '+esc(pr.gage)+'</p>':'')+'</div><div class="topact">'+(pr.ersteller!==uid?'<span class="cl">Von der Agentur angelegt</span>':state.kDelId===pr.id?'<button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Endgültig löschen</button><button type="button" class="btn" data-act="kpno">Abbrechen</button>':'<button type="button" class="btn" data-act="kpdup" data-id="'+esc(pr.id)+'">Duplizieren</button><button type="button" class="btn" data-act="kpedit" data-id="'+esc(pr.id)+'">Bearbeiten</button><button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Löschen</button>')+'</div></div>'+
+    h+='<div class="pcard"><div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start"><div style="min-width:0"><h2>'+esc(pr.name||'Ohne Namen')+'</h2>'+(pr.produktion?'<p class="cl" style="margin:4px 0 0">'+esc(pr.produktion)+'</p>':'')+(pr.gage?'<p class="cl" style="margin:4px 0 0">Gage: '+esc(pr.gage)+'</p>':'')+'</div><div class="topact">'+(pr.ersteller!==uid?'<span class="cl">Von der Agentur angelegt</span>':pr.geloescht?'<span class="pill">gelöscht</span>':state.kDelId===pr.id?'<button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Ja, löschen</button><button type="button" class="btn" data-act="kpno">Abbrechen</button>':'<button type="button" class="btn" data-act="kpdup" data-id="'+esc(pr.id)+'">Duplizieren</button><button type="button" class="btn" data-act="kpedit" data-id="'+esc(pr.id)+'">Bearbeiten</button><button type="button" class="btn danger" data-act="kpdel" data-id="'+esc(pr.id)+'">Löschen</button>')+'</div></div>'+
       (tg?'<div class="sec" style="margin-top:12px"><h3>Drehtage</h3><div class="days">'+tg+'</div></div>':'')+
       ((pr.rollen||[]).length?'<div class="sec"><h3>Gesucht</h3><div class="rolegrid">'+pr.rollen.map(function(r){var c=roleCrit(r);return '<div class="role"><b>'+esc(r.name||'Rolle')+'</b>'+(r.anzahl?' <span class="cm">× '+r.anzahl+'</span>':'')+'<div class="cl">'+(c.length?esc(c.join(' · ')):'Keine besonderen Anforderungen')+'</div></div>'}).join('')+'</div></div>':'')+'</div>';
+    if(state.kDelId===pr.id&&!pr.geloescht)h+='<p class="warn" role="alert" style="margin:10px 4px 0">Möchtest du dieses Projekt löschen? Es wird grau als „gelöscht“ markiert und kann danach nicht mehr geändert werden. Nur die Agentur kann es endgültig löschen oder wiederherstellen. Das Protokoll bleibt erhalten.</p>';
+    h+='<div class="pbar noprint" style="margin:10px 4px 0"><button type="button" class="btn small" data-act="plog" data-id="'+esc(pr.id)+'" data-t="'+esc(pr.name||'Projekt')+'">Protokoll öffnen</button></div>';
+    if(pr.geloescht){h+='<p class="gonemsg" role="status">Dieses Projekt wurde gelöscht'+(pr.geloeschtAm?' am '+esc(fmtDT(pr.geloeschtAm)):'')+'. Es kann nichts mehr geändert werden. Bei Fragen wende dich an die Agentur.</p>';return}
     var gb=Object.keys(pr.auswahl||{}).some(function(k){return (pr.auswahl[k]||{}).st==='gebucht'});
     if(gb)h+='<p class="okmsg" role="status" style="margin:8px 4px 0">Die ausgewählten Darsteller wurden gebucht.</p><div class="pbar" style="margin:6px 4px 0"><button type="button" class="btn small" data-act="klist" data-id="'+esc(pr.id)+'">Liste der Gebuchten</button></div>';
     var all=docs.filter(function(d){return d.projId===pr.id});
@@ -2715,10 +2942,17 @@ async function renderKunde(){
     if(open.length){
       h+='<div class="pbar" style="margin-top:6px">'+(state.kSendConf===pr.id?'<span class="cl" style="flex:1 1 100%">Wirklich absenden? Danach kannst du deine Entscheidungen nicht mehr ändern.</span><button type="button" class="btn primary" data-act="ksendok" data-id="'+esc(pr.id)+'">Ja, absenden</button><button type="button" class="btn" data-act="ksendno">Abbrechen</button>':'<button type="button" class="btn primary" data-act="ksend" data-id="'+esc(pr.id)+'"'+(undec?' disabled':'')+'>Absenden</button>'+(undec?'<span class="cl">Noch '+undec+' ohne Entscheidung</span>':'<span class="cl">Alle Entscheidungen getroffen</span>'))+'</div>';
     }
-    h+='<div class="grid kgrid">';
+    var fotosK=aviewIsFotos();
+    h+=aviewToggle()+(fotosK?'<p class="cl" style="margin:8px 0 0">✓ bestätigen · ✕ ablehnen. Tippe auf ein Foto, um das ganze Profil zu sehen.</p>':'')+'<div class="'+(fotosK?'fgrid':'grid kgrid')+'" data-navgrp="k">';
     arr.sort(function(a,b){return String((a.snap||{}).nachname||'').localeCompare(String((b.snap||{}).nachname||''),'de')}).forEach(function(d){
       var s=d.snap||{},fin=isFinal(d),st=fin?(d.status||'offen'):(dr[d.key]||'offen');
       var booked=((pr.auswahl||{})[d.pid]||{}).st==='gebucht';
+      if(fotosK){
+        var kth=s.thumb||((s.fotos&&s.fotos[0])||{}).src,knm=((s.vorname||'')+' '+(s.nachname||'')).trim()||'Unbekannt';
+        h+=fotoKachel(kth,((s.vorname||'').charAt(0)+(s.nachname||'').charAt(0)).toUpperCase()||'?','data-act="kopen" data-key="'+esc(d.key)+'"',(fin?'<span class="score'+(st==='bestaetigt'?'':' no')+'">'+(st==='bestaetigt'?'Bestätigt':'Abgelehnt')+'</span>':'')+(booked?'<span class="score">gebucht</span>':'')+(d.rolle?'<span class="frl">'+esc(d.rolle)+'</span>':''),
+          fin?'':'<button type="button" class="btn small'+(st==='bestaetigt'?' primary':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="bestaetigt" aria-pressed="'+(st==='bestaetigt')+'" aria-label="Bestätigen: '+esc(knm)+'" title="Bestätigen">✓</button><button type="button" class="btn small'+(st==='abgelehnt'?' danger':'')+'" data-act="kdec" data-key="'+esc(d.key)+'" data-s="abgelehnt" aria-pressed="'+(st==='abgelehnt')+'" aria-label="Ablehnen: '+esc(knm)+'" title="Ablehnen">✕</button>',knm,'');
+        return;
+      }
       var card=profCard({vorname:s.vorname,nachname:s.nachname,thumb:s.thumb||((s.fotos&&s.fotos[0])||{}).src,typ:s.typ||[],geschlecht:s.geschlecht,alter:s.alter,plz:s.plz,ort:s.ort,groesse:s.groesse,konfektion:s.konfektion,schuh:s.schuh},{zoom:d.key});
       h+='<div class="mwrap">'+card+'<div class="mx">'+(fin?'<span class="pill">'+(st==='bestaetigt'?'Bestätigt':'Abgelehnt')+'</span><span class="cl">abgesendet</span>':'')+(d.rolle?'<span class="cl">Rolle: '+esc(d.rolle)+'</span>':'')+(booked?'<span class="score">gebucht</span>':'')+(!fin&&!d.rolle&&!booked?'&nbsp;':'')+'</div>'+
         (fin?'':
@@ -2738,10 +2972,10 @@ function kDecide(key,st){
 async function kSend(projId){
   var dr=state.kdraft||{},docs=Object.keys(state.kdocs||{}).map(function(k){return state.kdocs[k]}).filter(function(d){return d.projId===projId&&!isFinal(d)});
   if(!docs.length||docs.some(function(d){return !dr[d.key]}))return;
-  var ok=0,no=0;
+  var ok=0,no=0,pers=[];
   try{
     for(var i=0;i<docs.length;i++){
-      var d=docs[i];
+      var d=docs[i];pers.push({pid:d.pid,name:(((d.snap||{}).vorname||'')+' '+((d.snap||{}).nachname||'')).trim()||'Unbekannt',rolle:d.rolle||'',s:dr[d.key]});
       await db.doc('kunden/'+uid+'/auswahl/'+d.key).update({status:dr[d.key],final:true,decidedAt:Date.now()});
       if(dr[d.key]==='bestaetigt')ok++;else no++;
       delete dr[d.key];
@@ -2749,6 +2983,7 @@ async function kSend(projId){
     db.doc('projekte/'+projId).update({kundeAntwortAt:Date.now()}).catch(function(){});
     var pr=state.projects.filter(function(x){return x.id===projId})[0];
     logEv('auswahl.entschieden','Entscheidung zu Projekt „'+((pr&&pr.name)||'Ohne Namen')+'“ abgesendet ('+ok+' bestätigt, '+no+' abgelehnt)',{projId:projId});
+    logP(projId,'auswahl.entschieden','Auswahl entschieden: '+ok+' bestätigt, '+no+' abgelehnt',{personen:pers},true);
     toast('Abgesendet. Die Agentur hat deine Auswahl erhalten.');
   }catch(e){toast('Absenden hat nicht geklappt. Versuche es noch einmal.'+errWhy(e))}
   state.kSendConf='';renderKunde();
@@ -2927,7 +3162,7 @@ async function doBewerben(key){
   renderBuch(true);
 }
 /* Admin: Bewerbungen in die Auswahl übernehmen */
-function bewNew(pr){var s=pr.auswahl||{};return Object.keys(s).filter(function(k){return s[k].bew&&s[k].ok===false&&s[k].st==='auswahl'}).length}
+function bewNew(pr){if(pr.geloescht)return 0;var s=pr.auswahl||{};return Object.keys(s).filter(function(k){return s[k].bew&&s[k].ok===false&&s[k].st==='auswahl'}).length}
 async function importBews(){
   if(state.bewBusy||!state.bews||!state.projects.length)return;
   var todo=state.bews.filter(function(b){return !b.imported});
@@ -2938,7 +3173,7 @@ async function importBews(){
     todo.forEach(function(b){(byP[b.projId]=byP[b.projId]||[]).push(b)});
     for(var pid in byP){
       var pr=state.projects.filter(function(x){return x.id===pid})[0];
-      if(!pr){continue}
+      if(!pr||pr.geloescht){continue}
       var m=Object.assign({},pr.auswahl||{}),ch=false;
       byP[pid].forEach(function(b){
         if(!m[b.pid]){m[b.pid]={st:'auswahl',ok:false,bew:true,rolle:b.rolle||'',rolleId:b.rolleId||'',at:b.at||Date.now()};ch=true}
@@ -2952,15 +3187,48 @@ async function importBews(){
 }
 
 async function removeProj(){
-  var pr=curProj();if(!pr)return;
+  /* "Löschen": nur als gelöscht markieren (grau). Endgültig löschen kann nur die Agentur. */
+  var pr=curProj();if(!pr||pr.geloescht)return;
+  var now=Date.now();
   try{
-    await db.doc('projekte/'+pr.id).delete();
-    logEv('projekt.geloescht','Projekt „'+(pr.name||'Ohne Namen')+'“ gelöscht');
-    if(isAdmin){syncAusschreibung(pr.id,null);Object.keys(pr.auswahl||{}).forEach(function(k){if(pr.auswahl[k].st==='gebucht'){try{db.doc('buchungen/'+k+'/e/'+pr.id).delete().catch(function(){})}catch(e){}}})}
-    if(role==='kunde'){try{var kq=await db.collection('kunden/'+uid+'/auswahl').get();for(var qi=0;qi<kq.docs.length;qi++){if((kq.docs[qi].data()||{}).projId===pr.id)await db.doc('kunden/'+uid+'/auswahl/'+kq.docs[qi].id).delete().catch(function(){})}}catch(e){}}
-    state.projects=state.projects.filter(function(x){return x.id!==pr.id});
-    state.confirmDelP=false;state.kDelId='';state.pid='';state.kOpen='';toast('Projekt gelöscht');if(state.view==='kunde')renderKunde();else renderProj();
+    await db.doc('projekte/'+pr.id).update({geloescht:true,geloeschtAm:now,geloeschtVon:uid,updatedAt:now});
+    logEv('projekt.geloescht','Projekt „'+(pr.name||'Ohne Namen')+'“ gelöscht (markiert)',{projId:pr.id});
+    logP(pr.id,'projekt.geloescht','Projekt gelöscht ('+(isAdmin?'Agentur':'Produktion')+')',{},true);
+    if(isAdmin&&pr.oeffentlich)syncAusschreibung(pr.id,null);
+    state.projects=state.projects.map(function(x){return x.id===pr.id?Object.assign({},x,{geloescht:true,geloeschtAm:now,geloeschtVon:uid}):x});
+    state.confirmDelP=false;state.kDelId='';toast('Projekt gelöscht');
+    if(state.view==='kunde')renderKunde();else{state.ptab='del';state.pOpen=false;renderProj()}
   }catch(e){toast('Löschen hat nicht geklappt.'+errWhy(e))}
+}
+async function restoreProj(){
+  var pr=curProj();if(!isAdmin||!pr||!pr.geloescht)return;
+  try{
+    var rec=Object.assign({},pr);delete rec.id;delete rec.geloescht;delete rec.geloeschtAm;delete rec.geloeschtVon;rec.updatedAt=Date.now();
+    await db.doc('projekte/'+pr.id).set(rec);
+    logEv('projekt.wiederhergestellt','Projekt „'+(pr.name||'Ohne Namen')+'“ wiederhergestellt',{projId:pr.id});
+    logP(pr.id,'projekt.wiederhergestellt','Projekt wiederhergestellt (Agentur)',{},true);
+    state.ausDel=state.ausDel||{};delete state.ausDel[pr.id];
+    if(rec.oeffentlich)syncAusschreibung(pr.id,rec);
+    state.projects=state.projects.map(function(x){return x.id===pr.id?Object.assign({id:pr.id},rec):x});
+    state.confirmDelP=false;state.ptab=projStatus(rec);toast('Projekt wiederhergestellt');renderProj();
+  }catch(e){toast('Wiederherstellen hat nicht geklappt.'+errWhy(e))}
+}
+async function hardDeleteProj(){
+  var pr=curProj();if(!isAdmin||!pr||!pr.geloescht)return;
+  try{
+    try{await plogFill(pr)}catch(e){}
+    var gb=Object.keys(pr.auswahl||{}).filter(function(k){return pr.auswahl[k].st==='gebucht'});
+    await db.doc('plog/'+pr.id).set({name:pr.name||'Ohne Namen',produktion:pr.produktion||'',kundeId:pr.kundeId||'',erstellerName:pr.erstellerName||'',tage:pr.tage||[],geloeschtAm:pr.geloeschtAm||0,endgueltigAm:Date.now(),nBuchungen:gb.length});
+    await logP(pr.id,'projekt.endgueltig','Projekt endgültig gelöscht (Agentur)'+(gb.length?'. '+gb.length+' Buchung'+(gb.length===1?'':'en')+' aus den Terminen der Darsteller entfernt':''),gb.length?{personen:gb.map(function(k){return {pid:k,name:pName(findP(k)),rolle:pr.auswahl[k].rolle||''}})}:{},false);
+    await db.doc('projekte/'+pr.id).delete();
+    logEv('projekt.endgueltig','Projekt „'+(pr.name||'Ohne Namen')+'“ endgültig gelöscht',{projId:pr.id});
+    syncAusschreibung(pr.id,null);
+    gb.forEach(function(k){try{db.doc('buchungen/'+k+'/e/'+pr.id).delete().catch(function(){})}catch(e){}});
+    if(pr.kundeId)Object.keys(pr.auswahl||{}).forEach(function(k){try{db.doc('kunden/'+pr.kundeId+'/auswahl/'+pr.id+'_'+k).delete().catch(function(){})}catch(e){}});
+    state.projects=state.projects.filter(function(x){return x.id!==pr.id});
+    state.archiv=null;
+    state.confirmDelP=false;state.pid='';state.pOpen=false;toast('Projekt endgültig gelöscht. Das Protokoll liegt im Archiv.');renderProj();
+  }catch(e){toast('Endgültig löschen hat nicht geklappt.'+errWhy(e))}
 }
 
 /* ---------- Start ---------- */
@@ -2991,6 +3259,7 @@ async function start(){
     },function(){});
     db.collection('projekte').onSnapshot(function(snap){
       state.projects=snap.docs.map(function(d){return Object.assign({},d.data()||{},{id:d.id})});
+      state.ausDel=state.ausDel||{};state.projects.forEach(function(x){if(x.geloescht&&x.oeffentlich&&!state.ausDel[x.id]){state.ausDel[x.id]=1;syncAusschreibung(x.id,null)}});
       updateProjDot();importBews();
       if(state.view==='proj'&&$('#scrim').hidden)renderProj();
     },function(){});
@@ -3050,7 +3319,7 @@ async function anfragenHTML() {
 const q = new URLSearchParams(location.search);
 const prod = q.has('produktion'), isLocal = q.has('local');
 const pageUrl = (extra) => location.pathname + '?' + [isLocal ? 'local' : '', extra].filter(Boolean).join('&');
-const APP_VERSION = '1.14.40 (31.10.2026)';
+const APP_VERSION = '1.15.41 (02.11.2026)';
 (function(){var e=document.getElementById('appver');if(e)e.textContent='Version '+APP_VERSION;})();
 let reg = { kat: '', tages: false, text: false, ausb: false, komp: false, kdopt: false };
 const KAT = { komparse: 'Komparse', kd: 'Kleindarsteller', schauspieler: 'Schauspieler' };
